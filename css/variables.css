@@ -1,0 +1,60 @@
+:root {
+    /* Backgrounds — Light, clean, luxurious */
+    --bg-body: #f7f8fc;
+    --bg-sidebar: #ffffff;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f0f2f8;
+    --bg-input: #f2f4f9;
+    --bg-input-focus: #eaecf4;
+    --bg-topbar: rgba(255, 255, 255, 0.88);
+    --bg-player: rgba(255, 255, 255, 0.96);
+    --bg-modal-overlay: rgba(30, 35, 50, 0.45);
+    --bg-tag: #f0f1ff;
+    --bg-active: #eef0ff;
+
+    /* Borders */
+    --border-light: #e8eaf0;
+    --border-medium: #dcdfe8;
+    --border-focus: #7c8cf8;
+
+    /* Accent — Refined indigo-violet */
+    --accent-primary: #6366f1;
+    --accent-secondary: #818cf8;
+    --accent-tertiary: #a5b4fc;
+    --accent-blue: #6366f1;
+    --accent-pink: #ec4899;
+    --accent-purple: #8b5cf6;
+    --accent-green: #10b981;
+    --accent-gradient: linear-gradient(135deg, #6366f1, #8b5cf6, #a78bfa);
+    --accent-gradient-warm: linear-gradient(135deg, #f472b6, #818cf8, #6366f1);
+
+    /* Text — Rich darks on light */
+    --text-primary: #1e1f2b;
+    --text-secondary: #4b5068;
+    --text-muted: #8b90a5;
+    --text-faint: #b0b5c8;
+    --text-white: #ffffff;
+
+    /* Glass */
+    --glass-bg: rgba(255, 255, 255, 0.85);
+    --glass-border: rgba(99, 102, 241, 0.12);
+
+    /* Radius */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+
+    /* Shadows — Soft, elegant */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.08);
+    --shadow-xl: 0 24px 60px rgba(0, 0, 0, 0.1);
+    --shadow-card: 0 2px 12px rgba(99, 102, 241, 0.06);
+    --shadow-card-hover: 0 8px 30px rgba(99, 102, 241, 0.12);
+    --shadow-player: 0 -4px 30px rgba(0, 0, 0, 0.06);
+
+    /* Transitions */
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: all 0.15s ease;
+}

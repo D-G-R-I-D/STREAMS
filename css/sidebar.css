@@ -1,0 +1,191 @@
+/* ========== SIDEBAR ========== */
+.sidebar {
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border-light);
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    transition: var(--transition);
+}
+
+.sidebar-header {
+    padding: 24px 20px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sidebar-logo-icon {
+    width: 36px; height: 36px;
+    background: var(--accent-gradient);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; color: white;
+    box-shadow: 0 3px 12px rgba(99, 102, 241, 0.25);
+}
+
+.sidebar-logo-text {
+    font-size: 20px; font-weight: 800;
+    background: var(--accent-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 2px;
+}
+
+.sidebar-nav { padding: 8px 12px; flex: 1; overflow-y: auto; }
+
+.nav-section-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-faint);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 20px 12px 8px;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    text-decoration: none;
+    margin-bottom: 2px;
+    border: none;
+    background: none;
+    width: 100%;
+    font-family: inherit;
+    text-align: left;
+}
+
+.nav-item:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+
+.nav-item.active {
+    background: var(--bg-active);
+    color: var(--accent-primary);
+    font-weight: 600;
+}
+
+.nav-item i { width: 20px; text-align: center; font-size: 15px; }
+
+/* Sidebar User */
+.sidebar-user {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.user-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--accent-gradient);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: white;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
+}
+
+.user-info { flex: 1; min-width: 0; }
+
+.user-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+
+.user-plan {
+    font-size: 11px;
+    color: var(--accent-primary);
+    font-weight: 600;
+}
+
+.user-logout {
+    background: none; border: none;
+    color: var(--text-muted); cursor: pointer;
+    font-size: 16px; padding: 4px;
+    transition: var(--transition);
+    border-radius: 6px;
+}
+
+.user-logout:hover { color: #ef4444; background: #fef2f2; }
+
+/* Top Bar */
+.top-bar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 32px;
+    background: var(--bg-topbar);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.hamburger {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 22px;
+    cursor: pointer;
+    padding: 4px;
+}
+
+.search-bar {
+    display: flex;
+    align-items: center;
+    background: var(--bg-input);
+    border: 1.5px solid var(--border-light);
+    border-radius: 50px;
+    padding: 10px 18px;
+    flex: 1;
+    max-width: 480px;
+    transition: var(--transition);
+}
+
+.search-bar:focus-within {
+    border-color: var(--accent-primary);
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.08);
+}
+
+.search-bar i { color: var(--text-muted); margin-right: 10px; font-size: 14px; }
+
+.search-bar input {
+    background: none; border: none; outline: none;
+    color: var(--text-primary);
+    font-size: 14px;
+    width: 100%;
+    font-family: inherit;
+}
+
+.search-bar input::placeholder { color: var(--text-faint); }
+
+.top-bar-actions { display: flex; align-items: center; gap: 10px; }
+
+.top-btn {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: var(--bg-card);
+    border: 1.5px solid var(--border-light);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+    transition: var(--transition);
+}
+
+.top-btn:hover {
+    background: var(--bg-input);
+    color: var(--accent-primary);
+    border-color: var(--border-medium);
+}
