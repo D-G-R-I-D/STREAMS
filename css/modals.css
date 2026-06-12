@@ -1,0 +1,104 @@
+/* ========== MODALS ========== */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--bg-modal-overlay);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: var(--transition);
+}
+
+.modal-overlay.show { opacity: 1; pointer-events: all; }
+
+.modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-xl);
+    padding: 36px;
+    width: 90%;
+    max-width: 520px;
+    max-height: 85vh;
+    overflow-y: auto;
+    transform: translateY(20px) scale(0.97);
+    transition: var(--transition);
+    box-shadow: var(--shadow-xl);
+}
+
+.modal-overlay.show .modal { transform: translateY(0) scale(1); }
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+}
+
+.modal-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.modal-close {
+    background: var(--bg-input);
+    border: 1px solid var(--border-light);
+    color: var(--text-muted);
+    font-size: 16px;
+    cursor: pointer;
+    transition: var(--transition);
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+}
+
+.modal-close:hover { color: var(--text-primary); background: var(--bg-card-hover); }
+
+/* Upload Drop Zone */
+.upload-drop-zone {
+    border: 2px dashed var(--border-medium);
+    border-radius: var(--radius-lg);
+    padding: 40px 20px;
+    text-align: center;
+    margin-bottom: 20px;
+    transition: var(--transition);
+    cursor: pointer;
+    background: var(--bg-input);
+}
+
+.upload-drop-zone:hover, .upload-drop-zone.dragover {
+    border-color: var(--accent-primary);
+    background: var(--bg-tag);
+}
+
+.upload-drop-zone i {
+    font-size: 40px;
+    color: var(--accent-primary);
+    margin-bottom: 12px;
+}
+
+.upload-drop-zone p {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.upload-drop-zone .upload-hint {
+    font-size: 12px;
+    color: var(--text-faint);
+    margin-top: 4px;
+}
+
+/* Add to Playlist List inside Modal */
+.add-playlist-list .playlist-card {
+    cursor: pointer;
+    margin-bottom: 8px;
+}
+
+.add-playlist-list .playlist-card:hover {
+    border-color: var(--accent-primary);
+}
