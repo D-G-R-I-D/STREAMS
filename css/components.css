@@ -134,6 +134,17 @@
 
 .music-card:hover .card-play-btn { opacity: 1; transform: translateY(0); }
 
+/* Show play button when this card's song is playing */
+.music-card.playing .card-play-btn {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.music-card.playing {
+    border-color: var(--accent-primary);
+    box-shadow: var(--shadow-card-hover);
+}
+
 .card-title {
     font-size: 14px;
     font-weight: 600;
@@ -222,22 +233,50 @@
 
 .song-row.playing { background: var(--bg-active); }
 
+/* Song Number Column */
+.song-num-col {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+}
+
 .song-num {
     font-size: 14px;
     color: var(--text-muted);
     text-align: center;
 }
 
-.song-row:hover .song-num { display: none; }
-
-.song-row .song-play-icon {
-    display: none;
+.song-play-btn {
+    position: absolute;
+    inset: 0;
+    background: none;
+    border: none;
     color: var(--accent-primary);
     font-size: 14px;
-    text-align: center;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
 }
 
-.song-row:hover .song-play-icon { display: block; }
+.song-row:hover .song-num { display: none; }
+.song-row:hover .eq-bars { display: none; }
+.song-row:hover .song-play-btn { display: flex; }
+
+/* Always show play/pause for playing song */
+.song-row.playing .song-play-btn {
+    display: none;
+}
+.song-row.playing:hover .song-play-btn {
+    display: flex;
+}
+.song-row.playing:hover .eq-bars {
+    display: none;
+}
 
 .song-thumb {
     width: 44px; height: 44px;
@@ -371,6 +410,51 @@
 }
 
 .playlist-action-btn.delete:hover { color: #ef4444; border-color: #fecaca; background: #fef2f2; }
+
+/* Upload Song Card */
+.upload-song-card {
+    cursor: default;
+}
+
+.upload-song-card.playing {
+    border-color: var(--accent-primary);
+    background: var(--bg-active);
+}
+
+.upload-song-cover {
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: var(--bg-input);
+    position: relative;
+    cursor: pointer;
+}
+
+.upload-song-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.upload-song-play-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: var(--transition);
+    color: white;
+    font-size: 16px;
+}
+
+.upload-song-cover:hover .upload-song-play-overlay,
+.upload-song-card.playing .upload-song-play-overlay {
+    opacity: 1;
+}
 
 /* ========== GENRE BADGES ========== */
 .genre-badge {

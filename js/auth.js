@@ -1,6 +1,6 @@
 /**
  * STREAMS — Authentication System
- * Sign up, login, logout, session management
+ * Email/password + Google via Firebase, with local fallback
  */
 
 let currentUser = null;
@@ -40,9 +40,10 @@ function renderAuthPages() {
                     </form>
                     <div class="auth-divider">OR</div>
                     <div class="auth-social-btns">
-                        <button class="social-btn" title="Google"><i class="fab fa-google"></i></button>
-                        <button class="social-btn" title="Apple"><i class="fab fa-apple"></i></button>
-                        <button class="social-btn" title="Facebook"><i class="fab fa-facebook-f"></i></button>
+                        <button class="social-btn" onclick="handleGoogleSignIn()">
+                            <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+                            <span>Continue with Google</span>
+                        </button>
                     </div>
                     <div class="auth-footer">
                         Already have an account? <a onclick="showAuth('login')">Sign In</a>
@@ -74,9 +75,10 @@ function renderAuthPages() {
                     </form>
                     <div class="auth-divider">OR</div>
                     <div class="auth-social-btns">
-                        <button class="social-btn" title="Google"><i class="fab fa-google"></i></button>
-                        <button class="social-btn" title="Apple"><i class="fab fa-apple"></i></button>
-                        <button class="social-btn" title="Facebook"><i class="fab fa-facebook-f"></i></button>
+                        <button class="social-btn" onclick="handleGoogleSignIn()">
+                            <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+                            <span>Continue with Google</span>
+                        </button>
                     </div>
                     <div class="auth-footer">
                         Don't have an account? <a onclick="showAuth('signup')">Sign Up</a>
@@ -93,13 +95,12 @@ function showAuth(type) {
 }
 
 // ========== SIGNUP ==========
-function handleSignup() {
+async function handleSignup() {
     const name = document.getElementById('signupName').value.trim();
     const email = document.getElementById('signupEmail').value.trim();
     const password = document.getElementById('signupPassword').value;
     const confirm = document.getElementById('signupConfirmPassword').value;
     const errEl = document.getElementById('signupError');
-
     errEl.classList.remove('show');
 
     if (!name || !email || !password) { showAuthError(errEl, 'Please fill all fields'); return; }
@@ -109,19 +110,31 @@ function handleSignup() {
     let users = DB.get('users') || [];
     if (users.find(u => u.email === email)) { showAuthError(errEl, 'Email already registered'); return; }
 
-    const user = { id: uid(), name, email, password: btoa(password), createdAt: Date.now() };
+    // Try Firebase signup (non-blocking — works without Firebase too)
+    if (typeof firebaseEmailSignup === 'function') {
+        await firebaseEmailSignup(name, email, password);
+    }
+
+    const user = {
+        id: uid(),
+        name,
+        email,
+        password: btoa(password),
+        provider: 'email',
+        createdAt: Date.now()
+    };
     users.push(user);
     DB.set('users', users);
 
     currentUser = user;
     DB.set('currentUser', user);
-    showToast('Account created! Welcome to STREAMS', 'success');
+    showToast('Account created! Welcome to Streams', 'success');
     showPage('appPage');
     initApp();
 }
 
 // ========== LOGIN ==========
-function handleLogin() {
+async function handleLogin() {
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
     const errEl = document.getElementById('loginError');
@@ -130,8 +143,21 @@ function handleLogin() {
     if (!email || !password) { showAuthError(errEl, 'Please fill all fields'); return; }
 
     const users = DB.get('users') || [];
-    const user = users.find(u => u.email === email && atob(u.password) === password);
-    if (!user) { showAuthError(errEl, 'Invalid email or password'); return; }
+    const user = users.find(u => u.email === email);
+
+    if (!user) { showAuthError(errEl, 'No account found with this email'); return; }
+
+    if (user.provider === 'google' && !user.password) {
+        showAuthError(errEl, 'This account uses Google Sign-In. Click "Continue with Google" below.');
+        return;
+    }
+
+    if (atob(user.password) !== password) { showAuthError(errEl, 'Incorrect password'); return; }
+
+    // Try Firebase login (non-blocking)
+    if (typeof firebaseEmailLogin === 'function') {
+        await firebaseEmailLogin(email, password);
+    }
 
     currentUser = user;
     DB.set('currentUser', user);
@@ -142,10 +168,16 @@ function handleLogin() {
 
 // ========== LOGOUT ==========
 function handleLogout() {
+    if (typeof firebaseSignOut === 'function') firebaseSignOut();
     currentUser = null;
     DB.remove('currentUser');
     playerState.isPlaying = false;
-    if (audioContext) { audioContext.close(); audioContext = null; }
+    stopTone();
+    clearInterval(progressInterval);
+    if (audioContext) {
+        try { audioContext.close(); } catch(e) {}
+        audioContext = null;
+    }
     showPage('authPage');
     showAuth('login');
     showToast('Logged out successfully', 'info');

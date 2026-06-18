@@ -108,6 +108,11 @@ function playSong(song, queue, index) {
     playTone();
     startProgress();
     updatePlayingHighlight();
+    
+    // Update all play buttons across the UI
+    if (typeof updateAllPlayButtons === 'function') {
+        updateAllPlayButtons();
+    }
 }
 
 function togglePlay() {
@@ -119,6 +124,11 @@ function togglePlay() {
     if (playerState.isPlaying) playTone();
     else stopTone();
     updatePlayingHighlight();
+    
+    // Update all play buttons across the UI
+    if (typeof updateAllPlayButtons === 'function') {
+        updateAllPlayButtons();
+    }
 }
 
 function playNext() {
@@ -246,7 +256,27 @@ function toggleLikeCurrent() {
 // ========== UPDATE PLAYING HIGHLIGHT ==========
 function updatePlayingHighlight() {
     document.querySelectorAll('.song-row').forEach(r => {
-        r.classList.toggle('playing', r.dataset.songId === playerState.currentSong?.id);
+        const isCurrentSong = r.dataset.songId === playerState.currentSong?.id;
+        r.classList.toggle('playing', isCurrentSong);
+        
+        // Update eq bars and play button
+        const eqBars = r.querySelector('.eq-bars');
+        const playBtn = r.querySelector('.song-play-btn i');
+        const songNum = r.querySelector('.song-num');
+        const numCol = r.querySelector('.song-num-col');
+        
+        if (isCurrentSong) {
+            // Show eq bars, hide number
+            if (songNum) songNum.style.display = 'none';
+            if (eqBars) {
+                eqBars.style.display = 'flex';
+                eqBars.classList.toggle('paused', !playerState.isPlaying);
+            }
+            if (playBtn) playBtn.className = `fas ${playerState.isPlaying ? 'fa-pause' : 'fa-play'}`;
+        } else {
+            // Show number, no eq bars
+            if (songNum) songNum.style.display = '';
+        }
     });
 }
 

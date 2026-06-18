@@ -8,20 +8,6 @@ function uid() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
 }
 
-// ========== LOCALSTORAGE DATABASE ==========
-const DB = {
-    get(key) {
-        try { return JSON.parse(localStorage.getItem('STREAMS' + key)); }
-        catch { return null; }
-    },
-    set(key, val) {
-        localStorage.setItem('STREAMS' + key, JSON.stringify(val));
-    },
-    remove(key) {
-        localStorage.removeItem('STREAMS' + key);
-    }
-};
-
 // ========== TIME FORMATTERS ==========
 function durationToSeconds(dur) {
     const parts = dur.split(':');
@@ -53,6 +39,7 @@ function getGreeting() {
 // ========== TOAST NOTIFICATIONS ==========
 function showToast(msg, type = 'info') {
     const container = document.getElementById('toastContainer');
+    if (!container) return;
     const icons = {
         success: 'fa-check-circle',
         error: 'fa-exclamation-circle',
@@ -67,12 +54,6 @@ function showToast(msg, type = 'info') {
 
 // ========== PAGE NAVIGATION ==========
 function showPage(pageId) {
-    // Map old names to container IDs
-    const map = {
-        'appPage': 'appContainer',
-        'signupPage': 'authContainer',
-        'loginPage': 'authContainer',
-    };
     const authContainer = document.getElementById('authContainer');
     const appContainer = document.getElementById('appContainer');
 
@@ -104,7 +85,6 @@ document.addEventListener('keydown', e => {
         closeModal('playlistModal');
         closeModal('addToPlaylistModal');
     }
-    // Space bar to play/pause
     if (e.key === ' ' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
         e.preventDefault();
         if (typeof togglePlay === 'function') togglePlay();
