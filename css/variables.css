@@ -1,3 +1,4 @@
+/* ========== LIGHT THEME (Default) ========== */
 :root {
     /* Backgrounds — Light, clean, luxurious */
     --bg-body: #f7f8fc;
@@ -25,6 +26,7 @@
     --accent-pink: #ec4899;
     --accent-purple: #8b5cf6;
     --accent-green: #10b981;
+    --accent-red: #ef4444;
     --accent-gradient: linear-gradient(135deg, #6366f1, #8b5cf6, #a78bfa);
     --accent-gradient-warm: linear-gradient(135deg, #f472b6, #818cf8, #6366f1);
 
@@ -34,6 +36,7 @@
     --text-muted: #8b90a5;
     --text-faint: #b0b5c8;
     --text-white: #ffffff;
+    --text-inverse: #ffffff;
 
     /* Glass */
     --glass-bg: rgba(255, 255, 255, 0.85);
@@ -57,4 +60,56 @@
     /* Transitions */
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-fast: all 0.15s ease;
+}
+
+/* ========== DARK THEME ========== */
+[data-theme="dark"] {
+    /* Backgrounds — Rich, elegant dark */
+    --bg-body: #0f1117;
+    --bg-sidebar: #161921;
+    --bg-card: #1a1d27;
+    --bg-card-hover: #22252f;
+    --bg-input: #1e2129;
+    --bg-input-focus: #252830;
+    --bg-topbar: rgba(15, 17, 23, 0.92);
+    --bg-player: rgba(22, 25, 33, 0.96);
+    --bg-modal-overlay: rgba(0, 0, 0, 0.65);
+    --bg-tag: rgba(99, 102, 241, 0.15);
+    --bg-active: rgba(99, 102, 241, 0.12);
+
+    /* Borders */
+    --border-light: #2a2d38;
+    --border-medium: #363944;
+    --border-focus: #6366f1;
+
+    /* Accent — Keep vibrant */
+    --accent-primary: #818cf8;
+    --accent-secondary: #a5b4fc;
+    --accent-tertiary: #c7d2fe;
+
+    /* Text — Light on dark */
+    --text-primary: #f1f3f9;
+    --text-secondary: #a8aec0;
+    --text-muted: #6b7280;
+    --text-faint: #4b5068;
+    --text-white: #ffffff;
+    --text-inverse: #1e1f2b;
+
+    /* Glass */
+    --glass-bg: rgba(22, 25, 33, 0.85);
+    --glass-border: rgba(99, 102, 241, 0.2);
+
+    /* Shadows — Darker */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.25);
+    --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.35);
+    --shadow-xl: 0 24px 60px rgba(0, 0, 0, 0.4);
+    --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.2);
+    --shadow-card-hover: 0 8px 30px rgba(99, 102, 241, 0.15);
+    --shadow-player: 0 -4px 30px rgba(0, 0, 0, 0.25);
+}
+
+/* Theme transition */
+body, .sidebar, .top-bar, .player-bar, .modal, .auth-card {
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
