@@ -27,6 +27,10 @@ function initFirebaseAuth() {
     try {
         firebase.initializeApp(firebaseConfig);
         firebaseAuth = firebase.auth();
+
+        // Fix for 127.0.0.1 — tell Firebase to use the authDomain for popups
+        firebaseAuth.useDeviceLanguage();
+        
         googleProvider = new firebase.auth.GoogleAuthProvider();
         googleProvider.addScope('profile');
         googleProvider.addScope('email');
