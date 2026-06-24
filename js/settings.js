@@ -35,7 +35,7 @@ function renderSettings(el) {
     const user = currentUser;
     const allUsers = DB.get('users') || [];
     const otherUsers = allUsers.filter(u => u.id !== user?.id);
-
+//|| user?.name?.charAt(0).toUpperCase() || 'A'
     el.innerHTML = `
         <div class="section-header">
             <h2 class="section-title"><i class="fas fa-gear"></i> Settings</h2>
@@ -46,7 +46,7 @@ function renderSettings(el) {
             <div class="settings-section-title">Profile</div>
             <div class="settings-card">
                 <div class="profile-header">
-                    <div class="profile-avatar-large">${user?.name?.charAt(0).toUpperCase() || 'A'}</div>
+                    <div class="profile-avatar-large"><img class="user-avatar-img" src="${currentUser?.picture}" alt="" referrerpolicy="no-referrer"></div>
                     <div class="profile-info">
                         <h3>${user?.name || 'User'}</h3>
                         <p>${user?.email || 'email@example.com'}</p>
