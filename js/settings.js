@@ -216,10 +216,24 @@ function renderSettings(el) {
 
 // ========== STORAGE HELPERS ==========
 function getStorageSize() {
-    const total = DB.getSize();
+    // Combine localStorage + estimate IndexedDB
+    const lsSize = DB.getSize();
+    // We can't synchronously measure IndexedDB, so show localStorage for now
+    const total = lsSize;
     if (total < 1024) return total + ' B';
     if (total < 1024 * 1024) return (total / 1024).toFixed(1) + ' KB';
     return (total / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+// Async version that counts IndexedDB audio files
+async function getFullStorageInfo() {
+    try {
+        const audioCount = await StreamsDB.count('audioFiles');
+        const coverCount = await StreamsDB.count('coverImages');
+        return { audioFiles: audioCount, coverImages: coverCount };
+    } catch(e) {
+        return { audioFiles: 0, coverImages: 0 };
+    }
 }
 
 function clearCache() {

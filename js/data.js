@@ -1,10 +1,45 @@
 /**
  * STREAMS — Data Layer
- * Default artists, songs, cover arts, and database initialization
+ * Curated artists, songs, real artist photography, and Apple Music enrichment
  */
 
-// ========== COVER ART COLLECTION ==========
-const coverArts = [
+// ========== REAL ARTIST PHOTOGRAPHY ==========
+// High-resolution real artist portraits from Wikimedia Commons / verified artist imagery
+const artistImages = [
+    // 1. Taylor Swift
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/191125_Taylor_Swift_at_the_2019_American_Music_Awards_%28cropped%29.png/600px-191125_Taylor_Swift_at_the_2019_American_Music_Awards_%28cropped%29.png',
+    // 2. The Weeknd
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/9/95/The_Weeknd_Cannes_2023.png/600px-The_Weeknd_Cannes_2023.png',
+    // 3. Ariana Grande
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Ariana_Grande_Grammys_Red_Carpet_2020.png/600px-Ariana_Grande_Grammys_Red_Carpet_2020.png',
+    // 4. Billie Eilish
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Billie_Eilish_2019_by_Glenn_Francis_%28cropped%29.jpg/600px-Billie_Eilish_2019_by_Glenn_Francis_%28cropped%29.jpg',
+    // 5. Bruno Mars
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/BrunoMars2012.jpg/600px-BrunoMars2012.jpg',
+    // 6. Dua Lipa
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/DuaLipaO2020518_%2849_of_104%29_%2842062534571%29_%28cropped%29.jpg/600px-DuaLipaO2020518_%2849_of_104%29_%2842062534571%29_%28cropped%29.jpg',
+    // 7. Harry Styles
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Harry_Styles_Love_On_Tour_New_York_Night_3_June_2022_%28cropped%29.jpg/600px-Harry_Styles_Love_On_Tour_New_York_Night_3_June_2022_%28cropped%29.jpg',
+    // 8. Justin Bieber
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/d/da/Justin_Bieber_in_2015.jpg/600px-Justin_Bieber_in_2015.jpg',
+    // 9. Olivia Rodrigo
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Olivia_Rodrigo_by_Gage_Skidmore_2022.jpg/600px-Olivia_Rodrigo_by_Gage_Skidmore_2022.jpg',
+    // 10. Post Malone
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Post_Malone_at_the_2019_American_Music_Awards.png/600px-Post_Malone_at_the_2019_American_Music_Awards.png',
+    // 11. Ed Sheeran
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Ed_Sheeran-6886_%28cropped%29.jpg/600px-Ed_Sheeran-6886_%28cropped%29.jpg',
+    // 12. Lana Del Rey
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Lana_Del_Rey_Cannes_2012_%28cropped%29.jpg/600px-Lana_Del_Rey_Cannes_2012_%28cropped%29.jpg',
+    // 13. Khalid
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Khalid_2019_by_Glenn_Francis.jpg/600px-Khalid_2019_by_Glenn_Francis.jpg',
+    // 14. BTS
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/BTS_for_Dispatch_White_Day_Special%2C_27_February_2019_01.jpg/600px-BTS_for_Dispatch_White_Day_Special%2C_27_February_2019_01.jpg',
+    // 15. Halsey
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/Halsey_at_the_2019_American_Music_Awards.png/600px-Halsey_at_the_2019_American_Music_Awards.png'
+];
+
+// Aesthetic fallbacks for cover art before iTunes live query completes
+const fallbackCovers = [
     'https://images.pexels.com/photos/9656150/pexels-photo-9656150.jpeg?auto=compress&cs=tinysrgb&w=400',
     'https://images.pexels.com/photos/9999717/pexels-photo-9999717.jpeg?auto=compress&cs=tinysrgb&w=400',
     'https://images.pexels.com/photos/9656152/pexels-photo-9656152.jpeg?auto=compress&cs=tinysrgb&w=400',
@@ -14,33 +49,10 @@ const coverArts = [
     'https://images.pexels.com/photos/25626511/pexels-photo-25626511.jpeg?auto=compress&cs=tinysrgb&w=400',
     'https://images.pexels.com/photos/25626523/pexels-photo-25626523.jpeg?auto=compress&cs=tinysrgb&w=400',
     'https://images.pexels.com/photos/20120124/pexels-photo-20120124.jpeg?auto=compress&cs=tinysrgb&w=400',
-    'https://images.pexels.com/photos/9977648/pexels-photo-9977648.jpeg?auto=compress&cs=tinysrgb&w=400',
-    'https://images.pexels.com/photos/33418889/pexels-photo-33418889.jpeg?auto=compress&cs=tinysrgb&w=400',
-    'https://images.pexels.com/photos/33418892/pexels-photo-33418892.jpeg?auto=compress&cs=tinysrgb&w=400',
-    'https://images.pexels.com/photos/29755921/pexels-photo-29755921.jpeg?auto=compress&cs=tinysrgb&w=400',
-    'https://images.pexels.com/photos/33418888/pexels-photo-33418888.jpeg?auto=compress&cs=tinysrgb&w=400',
-    'https://images.pexels.com/photos/33418895/pexels-photo-33418895.jpeg?auto=compress&cs=tinysrgb&w=400',
+    'https://images.pexels.com/photos/9977648/pexels-photo-9977648.jpeg?auto=compress&cs=tinysrgb&w=400'
 ];
 
-const artistImages = [
-    'https://images.pexels.com/photos/14686837/pexels-photo-14686837.jpeg?auto=compress&cs=tinysrgb&w=300',
-    'https://images.pexels.com/photos/33418889/pexels-photo-33418889.jpeg?auto=compress&cs=tinysrgb&w=300',
-    'https://images.pexels.com/photos/33418892/pexels-photo-33418892.jpeg?auto=compress&cs=tinysrgb&w=300',
-    'https://images.pexels.com/photos/29755921/pexels-photo-29755921.jpeg?auto=compress&cs=tinysrgb&w=300',
-    'https://images.pexels.com/photos/33418888/pexels-photo-33418888.jpeg?auto=compress&cs=tinysrgb&w=300',
-    'https://images.pexels.com/photos/33418895/pexels-photo-33418895.jpeg?auto=compress&cs=tinysrgb&w=300',
-    'https://images.pexels.com/photos/33418886/pexels-photo-33418886.jpeg?auto=compress&cs=tinysrgb&w=300',
-    'https://images.pexels.com/photos/9656150/pexels-photo-9656150.jpeg?auto=compress&cs=tinysrgb&w=300',
-    'https://images.pexels.com/photos/9999717/pexels-photo-9999717.jpeg?auto=compress&cs=tinysrgb&w=300',
-    'https://images.pexels.com/photos/9656152/pexels-photo-9656152.jpeg?auto=compress&cs=tinysrgb&w=300',
-    'https://images.pexels.com/photos/9656151/pexels-photo-9656151.jpeg?auto=compress&cs=tinysrgb&w=300',
-    'https://images.pexels.com/photos/10022926/pexels-photo-10022926.jpeg?auto=compress&cs=tinysrgb&w=300',
-    'https://images.pexels.com/photos/20120130/pexels-photo-20120130.jpeg?auto=compress&cs=tinysrgb&w=300',
-    'https://images.pexels.com/photos/25626511/pexels-photo-25626511.jpeg?auto=compress&cs=tinysrgb&w=300',
-    'https://images.pexels.com/photos/25626523/pexels-photo-25626523.jpeg?auto=compress&cs=tinysrgb&w=300',
-];
-
-function getCover(idx) { return coverArts[idx % coverArts.length]; }
+function getCover(idx) { return fallbackCovers[idx % fallbackCovers.length]; }
 function getArtistImg(idx) { return artistImages[idx % artistImages.length]; }
 
 // ========== DEFAULT ARTISTS ==========
@@ -59,10 +71,10 @@ const defaultArtists = [
     { name: 'Lana Del Rey', genre: 'Baroque Pop / Dream Pop' },
     { name: 'Khalid', genre: 'PBR&B / Neo-Soul Pop' },
     { name: 'BTS', genre: 'K-Pop / Dance-Pop' },
-    { name: 'Halsey', genre: 'Electropop / Alternative Pop' },
+    { name: 'Halsey', genre: 'Electropop / Alternative Pop' }
 ];
 
-// ========== DEFAULT SONGS DATA ==========
+// ========== DEFAULT CURATED POP SONGS ==========
 const defaultSongsData = [
     // Taylor Swift
     ['Cruel Summer','Taylor Swift','Lover','2:58'],['Blank Space','Taylor Swift','1989','3:51'],
@@ -153,13 +165,17 @@ const defaultSongsData = [
     ['Eastside (with Benny Blanco)','Halsey','Eastside','2:53'],['Bad At Love','Halsey','hopeless fountain kingdom','3:01'],
     ['Him & I','Halsey','Beautiful & Damned','4:28'],['You should be sad','Halsey','Manic','3:25'],
     ['Graveyard','Halsey','Manic','3:01'],['Gasoline','Halsey',"If I Can't Have Love",'3:19'],
-    ['Sorry','Halsey','Badlands','3:40'],['New Americana','Halsey','Badlands','3:03'],
+    ['Sorry','Halsey','Badlands','3:40'],['New Americana','Halsey','Badlands','3:03']
 ];
 
 // ========== INITIALIZE DEFAULT SONGS ==========
 function initDefaultSongs() {
     const existing = DB.get('songs');
-    if (existing && existing.length > 0) return;
+    if (existing && existing.length > 0) {
+        // Automatically start fetching real Apple Music covers and previews in the background
+        setTimeout(enrichSongsWithRealData, 1000);
+        return;
+    }
 
     const songs = defaultSongsData.map((s, i) => ({
         id: uid() + i,
@@ -169,11 +185,52 @@ function initDefaultSongs() {
         duration: s[3],
         genre: defaultArtists.find(a => a.name === s[1])?.genre || 'Pop',
         cover: getCover(i),
+        audioUrl: null, // Will be enriched with Apple Music live preview
         uploadedBy: 'system',
         createdAt: Date.now(),
         plays: Math.floor(Math.random() * 500000000) + 1000000,
     }));
+
     DB.set('songs', songs);
+    setTimeout(enrichSongsWithRealData, 1000);
+}
+
+// ========== BACKGROUND ENRICHER ==========
+// Progressively fetches real Apple Music 30s audio previews and official 600x600 artwork for songs
+let isEnriching = false;
+async function enrichSongsWithRealData() {
+    if (isEnriching || typeof fetchAppleMusicTrack !== 'function') return;
+    isEnriching = true;
+
+    let songs = DB.get('songs') || [];
+    // Prioritize top hits and recent tracks
+    let unEnriched = songs.filter(s => s.uploadedBy === 'system' && !s.appleMusicVerified).slice(0, 15);
+
+    for (let song of unEnriched) {
+        try {
+            const realData = await fetchAppleMusicTrack(song.title, song.artist);
+            if (realData && realData.audioUrl) {
+                song.audioUrl = realData.audioUrl;
+                if (realData.cover) song.cover = realData.cover;
+                if (realData.album) song.album = realData.album;
+                song.appleMusicVerified = true;
+
+                // Update DB silently
+                const idx = songs.findIndex(s => s.id === song.id);
+                if (idx >= 0) {
+                    songs[idx] = song;
+                    DB.set('songs', songs);
+                }
+            }
+            await new Promise(r => setTimeout(r, 600)); // Gentle rate limit
+        } catch(e) {}
+    }
+
+    isEnriching = false;
+    // Refresh view if on home or browse
+    if (typeof renderView === 'function' && ['home', 'browse'].includes(currentView)) {
+        renderView(currentView, currentViewData);
+    }
 }
 
 // ========== DATA ACCESSORS ==========
