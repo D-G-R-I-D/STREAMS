@@ -1,89 +1,76 @@
 /**
- * STREAMS — Apple Music & iTunes Live API Engine
- * Fetches real 30s AAC/M4A audio previews and official 600x600 album artwork directly from Apple Music
+ * STREAMS — iTunes/Apple Music API (JSONP only — guaranteed CORS-free)
+ * Fetches real 30s audio previews and official 600x600 album artwork
  */
 
 const ITUNES_CACHE = {};
+const DEEZER_CACHE = {};
+const NEGATIVE_CACHE = {}; // remembers lookups that found nothing, so we don't re-hit the network every retry
+const NEGATIVE_TTL_MS = 10 * 60 * 1000;
+let _jsonpId = 0;
 
-// Reliable fallback open-access real music streams (in case offline or iTunes preview restricted)
-const FALLBACK_REAL_STREAMS = [
-    'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3',
-    'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3',
-    'https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3',
-    'https://cdn.pixabay.com/download/audio/2022/10/25/audio_24847e1747.mp3',
-    'https://cdn.pixabay.com/download/audio/2023/04/18/audio_65cf27be51.mp3',
-    'https://cdn.pixabay.com/download/audio/2022/08/02/audio_884fe92c21.mp3',
-    'https://cdn.pixabay.com/download/audio/2021/11/23/audio_034b58e768.mp3',
-    'https://cdn.pixabay.com/download/audio/2022/05/16/audio_db6591201e.mp3'
-];
+function normalizeAppleText(value) {
+    return String(value || '')
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
 
-/**
- * Fetch real Apple Music track data (preview audio + high resolution cover art)
- * @param {string} title - Song title
- * @param {string} artist - Artist name
- * @returns {Promise<{audioUrl: string, cover: string, album: string, duration: string}|null>}
- */
-async function fetchAppleMusicTrack(title, artist) {
-    const cacheKey = `${title.toLowerCase().trim()}___${artist.toLowerCase().trim()}`;
-    if (ITUNES_CACHE[cacheKey]) return ITUNES_CACHE[cacheKey];
+function buildAppleMusicSearchQueries(title, artist) {
+    const cleanTitle = normalizeAppleText(title).replace(/\b(the|a|an)\b/g, '').trim();
+    const cleanArtist = normalizeAppleText(artist).replace(/\b(the|a|an)\b/g, '').trim();
+    const queries = [];
+    const pushUnique = (query) => {
+        if (query && !queries.includes(query)) queries.push(query);
+    };
 
-    // Clean title for search (remove remix/feat tags for better match if needed)
-    const cleanTitle = title.replace(/\s*\(.*?\)\s*/g, '').trim();
-    const query = encodeURIComponent(`${cleanTitle} ${artist}`);
-    const url = `https://itunes.apple.com/search?term=${query}&media=music&entity=song&limit=3`;
+    pushUnique(`${cleanTitle} ${cleanArtist}`.trim());
+    pushUnique(`${cleanArtist} ${cleanTitle}`.trim());
+    pushUnique(cleanTitle);
+    pushUnique(cleanArtist);
+    return queries.slice(0, 5);
+}
 
-    try {
-        const response = await fetch(url);
-        const data = await response.json();
+function scoreAppleMusicResult(result, title, artist) {
+    const normalizedTitle = normalizeAppleText(title);
+    const normalizedArtist = normalizeAppleText(artist);
+    const resultTitle = normalizeAppleText(result.trackName || result.collectionName || result.artistName || '');
+    const resultArtist = normalizeAppleText(result.artistName || result.collectionArtistName || '');
 
-        if (data && data.results && data.results.length > 0) {
-            // Find best matching track
-            let match = data.results.find(r => r.previewUrl && r.artworkUrl100);
-            if (!match) match = data.results[0];
-
-            if (match && match.previewUrl) {
-                // Upgrade 100x100 artwork to crisp 600x600 high-res Apple Music artwork
-                const highResCover = match.artworkUrl100 
-                    ? match.artworkUrl100.replace('100x100bb', '600x600bb')
-                    : null;
-
-                const durationSecs = match.trackTimeMillis ? Math.round(match.trackTimeMillis / 1000) : null;
-                const formattedDuration = durationSecs 
-                    ? `${Math.floor(durationSecs / 60)}:${(durationSecs % 60 < 10 ? '0' : '') + (durationSecs % 60)}`
-                    : null;
-
-                const result = {
-                    audioUrl: match.previewUrl,
-                    cover: highResCover,
-                    album: match.collectionName || null,
-                    duration: formattedDuration || null
-                };
-
-                ITUNES_CACHE[cacheKey] = result;
-                return result;
-            }
-        }
-    } catch (err) {
-        console.warn('iTunes API standard fetch failed, trying JSONP fallback...', err.message);
-        return await fetchAppleMusicJSONP(query, cacheKey);
+    let score = 0;
+    if (result.previewUrl) score += 80;
+    if (result.artworkUrl100) score += 45;
+    if (resultTitle && normalizedTitle) {
+        if (resultTitle === normalizedTitle) score += 90;
+        else if (resultTitle.includes(normalizedTitle) || normalizedTitle.includes(resultTitle)) score += 45;
     }
+    if (resultArtist && normalizedArtist) {
+        if (resultArtist === normalizedArtist) score += 60;
+        else if (resultArtist.includes(normalizedArtist) || normalizedArtist.includes(resultArtist)) score += 25;
+    }
+    if (result.collectionName) score += 10;
+    return score;
+}
 
-    return null;
+function toHighResArtwork(url) {
+    return url ? url.replace('100x100bb', '600x600bb') : null;
 }
 
 /**
- * JSONP fallback for iTunes API if browser CORS policy interferes
+ * Core JSONP request to iTunes Search API
+ * This is the ONLY reliable way to call iTunes from a browser without a backend
  */
-function fetchAppleMusicJSONP(query, cacheKey) {
+function itunesJSONP(query, entity, limit) {
     return new Promise((resolve) => {
-        const cbName = 'itunes_cb_' + Math.round(Math.random() * 1000000);
+        const cbName = '_itcb' + (++_jsonpId) + '_' + Math.round(Math.random() * 99999);
         const script = document.createElement('script');
-        script.src = `https://itunes.apple.com/search?term=${query}&media=music&entity=song&limit=3&callback=${cbName}`;
+        const encoded = encodeURIComponent(query);
+        script.src = `https://itunes.apple.com/search?term=${encoded}&media=music&entity=${entity}&limit=${limit}&country=US&lang=en_us&callback=${cbName}`;
 
-        const timeout = setTimeout(() => {
-            cleanup();
-            resolve(null);
-        }, 4000);
+        const timeout = setTimeout(() => { cleanup(); resolve(null); }, 3500);
 
         function cleanup() {
             clearTimeout(timeout);
@@ -93,36 +80,187 @@ function fetchAppleMusicJSONP(query, cacheKey) {
 
         window[cbName] = function(data) {
             cleanup();
-            if (data && data.results && data.results.length > 0) {
-                const match = data.results.find(r => r.previewUrl) || data.results[0];
-                if (match && match.previewUrl) {
-                    const res = {
-                        audioUrl: match.previewUrl,
-                        cover: match.artworkUrl100 ? match.artworkUrl100.replace('100x100bb', '600x600bb') : null,
-                        album: match.collectionName || null
-                    };
-                    ITUNES_CACHE[cacheKey] = res;
-                    resolve(res);
-                    return;
-                }
-            }
-            resolve(null);
+            resolve(data && data.results ? data.results : null);
         };
 
-        script.onerror = () => {
-            cleanup();
-            resolve(null);
-        };
-
+        script.onerror = () => { cleanup(); resolve(null); };
         document.head.appendChild(script);
     });
 }
 
-/**
- * Get a fallback real audio stream if Apple Music preview is temporarily unavailable
- */
-function getFallbackRealStream(index = 0) {
-    return FALLBACK_REAL_STREAMS[Math.abs(index) % FALLBACK_REAL_STREAMS.length];
+async function itunesFetchViaProxy(query, entity, limit) {
+    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=${entity}&limit=${limit}&country=US&lang=en_us`;
+    const candidates = [
+        url,
+        `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+    ];
+
+    for (const candidate of candidates) {
+        try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 4000);
+            const response = await fetch(candidate, { headers: { Accept: 'application/json' }, signal: controller.signal });
+            clearTimeout(timer);
+            if (!response.ok) continue;
+            const text = await response.text();
+            let payload = null;
+            try {
+                payload = JSON.parse(text);
+            } catch (e) {
+                const callbackMatch = text.match(/^[\s\S]*?\((\{[\s\S]*\})\)\s*;?\s*$/);
+                if (callbackMatch) {
+                    payload = JSON.parse(callbackMatch[1]);
+                }
+            }
+            if (payload && Array.isArray(payload.results)) return payload.results;
+            if (payload && payload.resultCount && Array.isArray(payload.results)) return payload.results;
+        } catch (e) {}
+    }
+
+    return null;
 }
 
-console.log('🍎 Apple Music Live API engine loaded');
+/**
+ * Fetch real Apple Music track data
+ * Returns: { audioUrl, cover, album, duration } or null
+ */
+async function fetchDeezerTrack(title, artist) {
+    const cacheKey = 'dz_' + (title + '___' + artist).toLowerCase().trim();
+    if (DEEZER_CACHE[cacheKey]) return DEEZER_CACHE[cacheKey];
+
+    try {
+        const query = `${title} ${artist}`.trim();
+        const response = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(query)}`);
+        if (!response.ok) return null;
+        const data = await response.json();
+        const track = (data.data || []).find(item => item?.preview) || data.data?.[0] || null;
+        if (!track) return null;
+
+        const result = {
+            audioUrl: track.preview || null,
+            cover: track.album?.cover_xl || track.album?.cover_big || null,
+            album: track.album?.title || null,
+            duration: track.duration ? Math.floor(track.duration / 60) + ':' + (track.duration % 60 < 10 ? '0' : '') + (track.duration % 60) : null
+        };
+        DEEZER_CACHE[cacheKey] = result;
+        return result;
+    } catch (e) {
+        return null;
+    }
+}
+
+async function fetchAppleMusicTrack(title, artist) {
+    const cacheKey = (title + '___' + artist).toLowerCase().trim();
+    if (ITUNES_CACHE[cacheKey]) return ITUNES_CACHE[cacheKey];
+    if (NEGATIVE_CACHE[cacheKey] && Date.now() - NEGATIVE_CACHE[cacheKey] < NEGATIVE_TTL_MS) return null;
+
+    // Fire the top search queries concurrently instead of one-at-a-time — this is what let
+    // a single lookup take 10-60s before (sequential queries x sequential entity fallbacks).
+    // Capped at 2 (not more) to avoid tripping iTunes' per-IP rate limit under enrichment load.
+    const searchQueries = buildAppleMusicSearchQueries(title, artist).slice(0, 2);
+    const resultSets = await Promise.all(searchQueries.map(async (query) => {
+        let results = await itunesJSONP(query, 'song', 6);
+        if (!results || results.length === 0) {
+            results = await itunesFetchViaProxy(query, 'song', 6);
+        }
+        return results || [];
+    }));
+
+    let bestMatch = null;
+    for (const results of resultSets) {
+        for (const result of results) {
+            const score = scoreAppleMusicResult(result, title, artist);
+            if (score > 0 && (!bestMatch || score > bestMatch.score)) {
+                bestMatch = { result, score };
+            }
+        }
+    }
+
+    let result = null;
+    if (bestMatch) {
+        const match = bestMatch.result;
+        const cover = toHighResArtwork(match.artworkUrl100);
+        const secs = match.trackTimeMillis ? Math.round(match.trackTimeMillis / 1000) : null;
+        const duration = secs
+            ? Math.floor(secs / 60) + ':' + (secs % 60 < 10 ? '0' : '') + (secs % 60)
+            : null;
+
+        result = {
+            audioUrl: match.previewUrl || null,
+            cover: cover,
+            album: match.collectionName || null,
+            duration: duration
+        };
+    } else {
+        result = await fetchDeezerTrack(title, artist);
+    }
+
+    if (result) {
+        ITUNES_CACHE[cacheKey] = result;
+    } else {
+        NEGATIVE_CACHE[cacheKey] = Date.now();
+    }
+    return result;
+}
+
+/**
+ * Fetch real artist image from Apple Music
+ * Returns: high-res image URL string or null
+ */
+async function fetchDeezerArtistImage(artistName) {
+    const cacheKey = 'dz_artist_' + artistName.toLowerCase().trim();
+    if (DEEZER_CACHE[cacheKey]) return DEEZER_CACHE[cacheKey];
+
+    try {
+        const response = await fetch(`https://api.deezer.com/search/artist?q=${encodeURIComponent(artistName)}`);
+        if (!response.ok) return null;
+        const data = await response.json();
+        const artist = data.data?.[0];
+        const img = artist?.picture_xl || artist?.picture_big || artist?.picture_medium || null;
+        if (img) DEEZER_CACHE[cacheKey] = img;
+        return img;
+    } catch (e) {
+        return null;
+    }
+}
+
+async function fetchArtistImage(artistName) {
+    const cacheKey = 'artist_' + artistName.toLowerCase().trim();
+    if (ITUNES_CACHE[cacheKey]) return ITUNES_CACHE[cacheKey];
+
+    const queries = buildAppleMusicSearchQueries(artistName, '').slice(0, 2);
+
+    // Run the artist-entity and song-entity lookups for every query concurrently
+    // instead of sequentially — this was the slowest part of populating artist rows.
+    const [artistResultSets, songResultSets] = await Promise.all([
+        Promise.all(queries.map(async (query) => {
+            let results = await itunesJSONP(query, 'musicArtist', 3);
+            if (!results || results.length === 0) results = await itunesFetchViaProxy(query, 'musicArtist', 3);
+            return results || [];
+        })),
+        Promise.all(queries.map(async (query) => {
+            let results = await itunesJSONP(query, 'song', 3);
+            if (!results || results.length === 0) results = await itunesFetchViaProxy(query, 'song', 3);
+            return results || [];
+        }))
+    ]);
+
+    const artistMatch = artistResultSets.flat().find(r => r?.artworkUrl100);
+    const songMatch = songResultSets.flat().find(r => r?.artworkUrl100);
+    const match = artistMatch || songMatch;
+
+    if (match?.artworkUrl100) {
+        const img = toHighResArtwork(match.artworkUrl100);
+        ITUNES_CACHE[cacheKey] = img;
+        return img;
+    }
+
+    const fallbackImg = await fetchDeezerArtistImage(artistName);
+    if (fallbackImg) {
+        ITUNES_CACHE[cacheKey] = fallbackImg;
+    }
+    return fallbackImg;
+}
+
+console.log('🍎 iTunes API engine loaded (JSONP mode)');

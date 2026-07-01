@@ -1,6 +1,6 @@
 /**
  * STREAMS — Music Player Engine
- * Real audio playback via HTML5 Audio + Web Audio API fallback
+ * Real audio playback via HTML5 Audio — no synthesized/fallback playback of any kind
  */
 
 let playerState = {
@@ -9,6 +9,7 @@ let playerState = {
     originalQueue: [],
     queueIndex: -1,
     isPlaying: false,
+    isLoading: false,
     isShuffle: false,
     repeatMode: 0,
     volume: 0.7,
@@ -17,60 +18,24 @@ let playerState = {
     duration: 0,
 };
 
-// Real HTML5 Audio element for actual playback
+// Real HTML5 Audio element — the only playback path. There is no synthesized/fallback
+// tone anymore, so we can never end up with a fake "song" playing alongside a real one.
 let audioElement = new Audio();
 audioElement.preload = 'metadata';
 
-// Web Audio API fallback for demo songs (no real audio file)
-let audioContext = null;
-let oscillator = null;
-let gainNode = null;
-let progressInterval = null;
-
-// Track whether we're playing a real file or simulating
-let isRealAudio = false;
-
-// ========== AUDIO INIT ==========
-function initAudio() {
-    if (!audioContext) {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    }
-}
-
-function playTone() {
-    if (!audioContext) initAudio();
-    stopTone();
-    oscillator = audioContext.createOscillator();
-    gainNode = audioContext.createGain();
-    const song = playerState.currentSong;
-    let hash = 0;
-    for (let i = 0; i < song.title.length; i++) hash = ((hash << 5) - hash) + song.title.charCodeAt(i);
-    const noteFreqs = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
-    oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(noteFreqs[Math.abs(hash) % noteFreqs.length], audioContext.currentTime);
-    gainNode.gain.setValueAtTime(playerState.volume * 0.05, audioContext.currentTime);
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    oscillator.start();
-}
-
-function stopTone() {
-    if (oscillator) {
-        try { oscillator.stop(); } catch(e) {}
-        oscillator = null;
-    }
-}
+// Bumped on every playSong() call. Async lookups check this before touching the audio
+// element or UI, so a slow fetch for a song the user has since skipped past can't
+// suddenly start playing over whatever is current now.
+let loadToken = 0;
 
 // ========== REAL AUDIO EVENT HANDLERS ==========
 audioElement.addEventListener('timeupdate', () => {
-    if (!isRealAudio) return;
     playerState.currentTime = audioElement.currentTime;
     playerState.duration = audioElement.duration || durationToSeconds(playerState.currentSong?.duration || '0:00');
     updateProgressUI();
 });
 
 audioElement.addEventListener('ended', () => {
-    if (!isRealAudio) return;
     if (playerState.repeatMode === 2) {
         audioElement.currentTime = 0;
         audioElement.play();
@@ -80,28 +45,9 @@ audioElement.addEventListener('ended', () => {
 });
 
 audioElement.addEventListener('loadedmetadata', () => {
-    if (!isRealAudio) return;
     playerState.duration = audioElement.duration;
     updateProgressUI();
 });
-
-// ========== SIMULATED PROGRESS (for demo songs without audio files) ==========
-function startSimulatedProgress() {
-    clearInterval(progressInterval);
-    progressInterval = setInterval(() => {
-        if (!playerState.isPlaying) return;
-        playerState.currentTime += 0.25;
-        if (playerState.currentTime >= playerState.duration) {
-            if (playerState.repeatMode === 2) {
-                playerState.currentTime = 0;
-            } else {
-                playNext();
-                return;
-            }
-        }
-        updateProgressUI();
-    }, 250);
-}
 
 function updateProgressUI() {
     const pct = playerState.duration > 0 ? (playerState.currentTime / playerState.duration) * 100 : 0;
@@ -117,10 +63,10 @@ function updateProgressUI() {
 async function playSong(song, queue, index) {
     if (!song) return;
 
-    // Stop any current playback
+    // Invalidate any in-flight fetch from a previous song so it can't hijack playback later
+    const token = ++loadToken;
+
     audioElement.pause();
-    stopTone();
-    clearInterval(progressInterval);
 
     playerState.currentSong = song;
     if (queue) {
@@ -129,45 +75,67 @@ async function playSong(song, queue, index) {
         playerState.queueIndex = index;
         if (playerState.isShuffle) shuffleQueue();
     }
-    playerState.isPlaying = true;
     playerState.currentTime = 0;
     playerState.duration = durationToSeconds(song.duration);
 
-    renderPlayerBar();
-    updatePlayingHighlight();
-    if (typeof updateAllPlayButtons === 'function') updateAllPlayButtons();
-
-    // Decide: IndexedDB upload vs Apple Music stream vs fallback
+    // Decide: IndexedDB upload vs cached Apple Music stream vs live fetch
     if (song.hasAudio) {
-        // Real user upload — load from IndexedDB and play
-        isRealAudio = true;
-        loadAndPlayAudio(song);
+        playerState.isPlaying = true;
+        playerState.isLoading = false;
+        renderPlayerBar();
+        updatePlayingHighlight();
+        if (typeof updateAllPlayButtons === 'function') updateAllPlayButtons();
+        loadAndPlayAudio(song, token);
     } else if (song.audioUrl) {
-        // Real stream URL (already fetched from Apple Music)
-        isRealAudio = true;
+        playerState.isPlaying = true;
+        playerState.isLoading = false;
+        renderPlayerBar();
+        updatePlayingHighlight();
+        if (typeof updateAllPlayButtons === 'function') updateAllPlayButtons();
         audioElement.src = song.audioUrl;
         audioElement.volume = playerState.isMuted ? 0 : playerState.volume;
-        audioElement.play().catch(e => {
-            console.warn('Cached audio URL playback failed, querying Apple Music...', e.message);
-            fetchAndPlayAppleMusic(song, index);
+        audioElement.load();
+        audioElement.play().catch(() => {
+            if (token !== loadToken) return;
+            playerState.isPlaying = false;
+            updateAllPlayButtons();
+            showToast(`⚠️ Preview for "${song.title}" could not start yet.`, 'warning');
         });
     } else {
-        // Query Apple Music live right now!
-        fetchAndPlayAppleMusic(song, index);
+        // No cached preview yet — show loading state (never a fake fallback sound)
+        // and fetch the real track. UI only flips to "playing" once real audio is ready.
+        playerState.isPlaying = false;
+        playerState.isLoading = true;
+        renderPlayerBar();
+        updatePlayingHighlight();
+        if (typeof updateAllPlayButtons === 'function') updateAllPlayButtons();
+        showToast(`🎵 Loading "${song.title}"...`, 'info');
+        fetchAndPlayAppleMusic(song, token);
     }
 }
 
-async function fetchAndPlayAppleMusic(song, index) {
+async function fetchAndPlayAppleMusic(song, token) {
+    const finishLoading = () => {
+        if (token !== loadToken) return false;
+        playerState.isLoading = false;
+        return true;
+    };
+
     if (typeof fetchAppleMusicTrack !== 'function') {
-        playFallbackAudio(song, index);
+        if (finishLoading()) {
+            updateAllPlayButtons();
+            showToast(`⚠️ Preview for "${song.title}" is not available right now.`, 'warning');
+        }
         return;
     }
 
-    showToast(`🎵 Connecting to Apple Music for "${song.title}"...`, 'info');
-
     try {
         const realData = await fetchAppleMusicTrack(song.title, song.artist);
-        if (realData && realData.audioUrl && playerState.currentSong?.id === song.id) {
+
+        // The user moved on to a different song while this was in flight — drop the result.
+        if (token !== loadToken) return;
+
+        if (realData && realData.audioUrl) {
             song.audioUrl = realData.audioUrl;
             if (realData.cover) song.cover = realData.cover;
             if (realData.album) song.album = realData.album;
@@ -181,13 +149,14 @@ async function fetchAndPlayAppleMusic(song, index) {
                 DB.set('songs', songs);
             }
 
-            // Update UI with real artwork
+            playerState.isLoading = false;
+            playerState.isPlaying = true;
             renderPlayerBar();
             if (typeof updateAllPlayButtons === 'function') updateAllPlayButtons();
 
-            isRealAudio = true;
             audioElement.src = song.audioUrl;
             audioElement.volume = playerState.isMuted ? 0 : playerState.volume;
+            audioElement.load();
             await audioElement.play();
             return;
         }
@@ -195,47 +164,22 @@ async function fetchAndPlayAppleMusic(song, index) {
         console.warn('Apple Music live fetch error:', e);
     }
 
-    // If Apple Music preview restricted or offline, play real open stream
-    playFallbackAudio(song, index);
-}
-
-function playFallbackAudio(song, index) {
-    if (playerState.currentSong?.id !== song.id) return;
-    const fallbackStream = typeof getFallbackRealStream === 'function' ? getFallbackRealStream(index) : null;
-    if (fallbackStream) {
-        isRealAudio = true;
-        audioElement.src = fallbackStream;
-        audioElement.volume = playerState.isMuted ? 0 : playerState.volume;
-        audioElement.play().catch(() => {
-            isRealAudio = false;
-            initAudio();
-            if (audioContext.state === 'suspended') audioContext.resume();
-            playTone();
-            startSimulatedProgress();
-        });
-    } else {
-        isRealAudio = false;
-        initAudio();
-        if (audioContext.state === 'suspended') audioContext.resume();
-        playTone();
-        startSimulatedProgress();
+    if (finishLoading()) {
+        playerState.isPlaying = false;
+        updateAllPlayButtons();
+        showToast(`⚠️ Preview for "${song.title}" is not available right now.`, 'warning');
     }
 }
 
 function togglePlay() {
-    if (!playerState.currentSong) return;
+    if (!playerState.currentSong || playerState.isLoading) return;
     playerState.isPlaying = !playerState.isPlaying;
 
     const btn = document.getElementById('mainPlayBtn');
     if (btn) btn.innerHTML = playerState.isPlaying ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
 
-    if (isRealAudio) {
-        if (playerState.isPlaying) audioElement.play();
-        else audioElement.pause();
-    } else {
-        if (playerState.isPlaying) playTone();
-        else stopTone();
-    }
+    if (playerState.isPlaying) audioElement.play();
+    else audioElement.pause();
 
     updatePlayingHighlight();
     if (typeof updateAllPlayButtons === 'function') updateAllPlayButtons();
@@ -249,8 +193,6 @@ function playNext() {
         else {
             playerState.isPlaying = false;
             audioElement.pause();
-            stopTone();
-            clearInterval(progressInterval);
             if (typeof updateAllPlayButtons === 'function') updateAllPlayButtons();
             return;
         }
@@ -263,7 +205,7 @@ function playPrev() {
     if (playerState.queue.length === 0) return;
     if (playerState.currentTime > 3) {
         playerState.currentTime = 0;
-        if (isRealAudio) audioElement.currentTime = 0;
+        audioElement.currentTime = 0;
         updateProgressUI();
         return;
     }
@@ -317,14 +259,14 @@ function toggleRepeat() {
 
 // ========== SEEK ==========
 function seekTrack(e) {
-    if (!playerState.currentSong) return;
+    if (!playerState.currentSong || playerState.isLoading) return;
     const bar = document.getElementById('progressBar');
     if (!bar) return;
     const rect = bar.getBoundingClientRect();
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const newTime = pct * playerState.duration;
     playerState.currentTime = newTime;
-    if (isRealAudio) audioElement.currentTime = newTime;
+    audioElement.currentTime = newTime;
     updateProgressUI();
 }
 
@@ -340,7 +282,6 @@ function changeVolume(e) {
     if (fill) fill.style.width = (pct * 100) + '%';
 
     audioElement.volume = pct;
-    if (gainNode) gainNode.gain.setValueAtTime(pct * 0.05, audioContext.currentTime);
     updateVolumeIcon();
 }
 
@@ -348,7 +289,6 @@ function toggleMute() {
     playerState.isMuted = !playerState.isMuted;
     const vol = playerState.isMuted ? 0 : playerState.volume;
     audioElement.volume = vol;
-    if (gainNode) gainNode.gain.setValueAtTime(vol * 0.05, audioContext?.currentTime || 0);
     const fill = document.getElementById('volumeFill');
     if (fill) fill.style.width = (vol * 100) + '%';
     updateVolumeIcon();
@@ -386,7 +326,7 @@ function renderPlayerBar() {
     bar.style.display = 'grid';
     bar.innerHTML = `
         <div class="player-track">
-            <div class="player-cover"><img src="${song.cover || getCover(0)}" alt=""></div>
+            <div class="player-cover"><img src="${song.cover || getCover(0)}" alt="" onerror="this.onerror=null;this.src='${getCover(0)}';"></div>
             <div class="player-track-info">
                 <div class="player-track-name">${song.title}</div>
                 <div class="player-track-artist">${song.artist}</div>
@@ -399,8 +339,8 @@ function renderPlayerBar() {
             <div class="player-buttons">
                 <button class="player-btn ${playerState.isShuffle ? 'active' : ''}" id="shuffleBtn" onclick="toggleShuffle()" title="Shuffle"><i class="fas fa-shuffle"></i></button>
                 <button class="player-btn" onclick="playPrev()" title="Previous"><i class="fas fa-backward-step"></i></button>
-                <button class="play-pause-btn" id="mainPlayBtn" onclick="togglePlay()">
-                    <i class="fas ${playerState.isPlaying ? 'fa-pause' : 'fa-play'}"></i>
+                <button class="play-pause-btn" id="mainPlayBtn" onclick="togglePlay()" ${playerState.isLoading ? 'disabled' : ''}>
+                    <i class="fas ${playerState.isLoading ? 'fa-spinner fa-spin' : playerState.isPlaying ? 'fa-pause' : 'fa-play'}"></i>
                 </button>
                 <button class="player-btn" onclick="playNext()" title="Next"><i class="fas fa-forward-step"></i></button>
                 <button class="player-btn ${playerState.repeatMode > 0 ? 'active' : ''}" id="repeatBtn" onclick="toggleRepeat()" title="Repeat">
@@ -429,9 +369,10 @@ function renderPlayerBar() {
 }
 
 // ========== LOAD AUDIO FROM INDEXEDDB ==========
-async function loadAndPlayAudio(song) {
+async function loadAndPlayAudio(song, token) {
     try {
         const audioRecord = await getAudioFile(song.id);
+        if (token !== loadToken) return;
         if (audioRecord && audioRecord.data) {
             const blob = new Blob([audioRecord.data], { type: audioRecord.type || 'audio/mpeg' });
             const url = URL.createObjectURL(blob);
@@ -439,20 +380,17 @@ async function loadAndPlayAudio(song) {
             audioElement.volume = playerState.isMuted ? 0 : playerState.volume;
             await audioElement.play();
             console.log('▶️ Playing:', song.title);
-        } else {
-            // No file found in IndexedDB — fall back to simulated
-            console.warn('Audio file not found in database, simulating playback');
-            isRealAudio = false;
-            initAudio();
-            if (audioContext.state === 'suspended') audioContext.resume();
-            playTone();
-            startSimulatedProgress();
+        } else if (token === loadToken) {
+            playerState.isPlaying = false;
+            updateAllPlayButtons();
+            showToast(`⚠️ Audio file for "${song.title}" is not available yet.`, 'warning');
         }
     } catch (e) {
         console.warn('Audio load failed:', e.message);
-        isRealAudio = false;
-        playTone();
-        startSimulatedProgress();
+        if (token !== loadToken) return;
+        playerState.isPlaying = false;
+        updateAllPlayButtons();
+        showToast(`⚠️ Audio file for "${song.title}" could not be loaded.`, 'warning');
     }
 }
 

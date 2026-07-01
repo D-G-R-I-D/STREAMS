@@ -323,9 +323,8 @@ function switchToAccount(userId) {
     
     // Stop playback
     playerState.isPlaying = false;
-    stopTone();
-    clearInterval(progressInterval);
-    
+    audioElement.pause();
+
     // Reinitialize app
     initApp();
     showToast(`Switched to ${user.name}`, 'success');
@@ -336,10 +335,7 @@ function openAddAccountModal() {
     currentUser = null;
     DB.remove('currentUser');
     playerState.isPlaying = false;
-    if (audioContext) { 
-        try { audioContext.close(); } catch(e) {}
-        audioContext = null; 
-    }
+    audioElement.pause();
     showPage('authPage');
     showAuth('signup');
     showToast('Sign in with another account', 'info');
