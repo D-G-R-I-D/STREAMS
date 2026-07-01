@@ -1,6 +1,6 @@
 /**
  * STREAMS — Music Player Engine
- * Web Audio API playback, controls, progress, volume
+ * Real audio playback via HTML5 Audio — no synthesized/fallback playback of any kind
  */
 
 let playerState = {
@@ -9,76 +9,48 @@ let playerState = {
     originalQueue: [],
     queueIndex: -1,
     isPlaying: false,
+    isLoading: false,
     isShuffle: false,
-    repeatMode: 0, // 0: off, 1: all, 2: one
+    repeatMode: 0,
     volume: 0.7,
     isMuted: false,
     currentTime: 0,
     duration: 0,
 };
 
-let audioContext = null;
-let oscillator = null;
-let gainNode = null;
-let progressInterval = null;
+// Real HTML5 Audio element — the only playback path. There is no synthesized/fallback
+// tone anymore, so we can never end up with a fake "song" playing alongside a real one.
+let audioElement = new Audio();
+audioElement.preload = 'metadata';
 
-// ========== AUDIO INIT ==========
-function initAudio() {
-    if (!audioContext) {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+// Bumped on every playSong() call. Async lookups check this before touching the audio
+// element or UI, so a slow fetch for a song the user has since skipped past can't
+// suddenly start playing over whatever is current now.
+let loadToken = 0;
+
+// ========== REAL AUDIO EVENT HANDLERS ==========
+audioElement.addEventListener('timeupdate', () => {
+    playerState.currentTime = audioElement.currentTime;
+    playerState.duration = audioElement.duration || durationToSeconds(playerState.currentSong?.duration || '0:00');
+    updateProgressUI();
+});
+
+audioElement.addEventListener('ended', () => {
+    if (playerState.repeatMode === 2) {
+        audioElement.currentTime = 0;
+        audioElement.play();
+    } else {
+        playNext();
     }
-}
+});
 
-function playTone() {
-    if (!audioContext) initAudio();
-    stopTone();
-
-    oscillator = audioContext.createOscillator();
-    gainNode = audioContext.createGain();
-
-    const song = playerState.currentSong;
-    let hash = 0;
-    for (let i = 0; i < song.title.length; i++) hash = ((hash << 5) - hash) + song.title.charCodeAt(i);
-    const noteFreqs = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
-    const freq = noteFreqs[Math.abs(hash) % noteFreqs.length];
-
-    oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
-    gainNode.gain.setValueAtTime(playerState.volume * 0.05, audioContext.currentTime);
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    oscillator.start();
-}
-
-function stopTone() {
-    if (oscillator) {
-        try { oscillator.stop(); } catch(e) {}
-        oscillator = null;
-    }
-}
-
-// ========== PROGRESS TRACKING ==========
-function startProgress() {
-    clearInterval(progressInterval);
-    const totalSec = playerState.duration;
-
-    progressInterval = setInterval(() => {
-        if (!playerState.isPlaying) return;
-        playerState.currentTime += 0.25;
-        if (playerState.currentTime >= totalSec) {
-            if (playerState.repeatMode === 2) {
-                playerState.currentTime = 0;
-            } else {
-                playNext();
-                return;
-            }
-        }
-        updateProgressUI();
-    }, 250);
-}
+audioElement.addEventListener('loadedmetadata', () => {
+    playerState.duration = audioElement.duration;
+    updateProgressUI();
+});
 
 function updateProgressUI() {
-    const pct = (playerState.currentTime / playerState.duration) * 100;
+    const pct = playerState.duration > 0 ? (playerState.currentTime / playerState.duration) * 100 : 0;
     const fill = document.getElementById('progressFill');
     if (fill) fill.style.width = pct + '%';
     const ct = document.getElementById('currentTime');
@@ -88,10 +60,13 @@ function updateProgressUI() {
 }
 
 // ========== PLAY SONG ==========
-function playSong(song, queue, index) {
+async function playSong(song, queue, index) {
     if (!song) return;
-    initAudio();
-    if (audioContext.state === 'suspended') audioContext.resume();
+
+    // Invalidate any in-flight fetch from a previous song so it can't hijack playback later
+    const token = ++loadToken;
+
+    audioElement.pause();
 
     playerState.currentSong = song;
     if (queue) {
@@ -100,35 +75,114 @@ function playSong(song, queue, index) {
         playerState.queueIndex = index;
         if (playerState.isShuffle) shuffleQueue();
     }
-    playerState.isPlaying = true;
     playerState.currentTime = 0;
     playerState.duration = durationToSeconds(song.duration);
 
-    renderPlayerBar();
-    playTone();
-    startProgress();
-    updatePlayingHighlight();
-    
-    // Update all play buttons across the UI
-    if (typeof updateAllPlayButtons === 'function') {
+    // Decide: IndexedDB upload vs cached Apple Music stream vs live fetch
+    if (song.hasAudio) {
+        playerState.isPlaying = true;
+        playerState.isLoading = false;
+        renderPlayerBar();
+        updatePlayingHighlight();
+        if (typeof updateAllPlayButtons === 'function') updateAllPlayButtons();
+        loadAndPlayAudio(song, token);
+    } else if (song.audioUrl) {
+        playerState.isPlaying = true;
+        playerState.isLoading = false;
+        renderPlayerBar();
+        updatePlayingHighlight();
+        if (typeof updateAllPlayButtons === 'function') updateAllPlayButtons();
+        audioElement.src = song.audioUrl;
+        audioElement.volume = playerState.isMuted ? 0 : playerState.volume;
+        audioElement.load();
+        audioElement.play().catch(() => {
+            if (token !== loadToken) return;
+            playerState.isPlaying = false;
+            updateAllPlayButtons();
+            showToast(`⚠️ Preview for "${song.title}" could not start yet.`, 'warning');
+        });
+    } else {
+        // No cached preview yet — show loading state (never a fake fallback sound)
+        // and fetch the real track. UI only flips to "playing" once real audio is ready.
+        playerState.isPlaying = false;
+        playerState.isLoading = true;
+        renderPlayerBar();
+        updatePlayingHighlight();
+        if (typeof updateAllPlayButtons === 'function') updateAllPlayButtons();
+        showToast(`🎵 Loading "${song.title}"...`, 'info');
+        fetchAndPlayAppleMusic(song, token);
+    }
+}
+
+async function fetchAndPlayAppleMusic(song, token) {
+    const finishLoading = () => {
+        if (token !== loadToken) return false;
+        playerState.isLoading = false;
+        return true;
+    };
+
+    if (typeof fetchAppleMusicTrack !== 'function') {
+        if (finishLoading()) {
+            updateAllPlayButtons();
+            showToast(`⚠️ Preview for "${song.title}" is not available right now.`, 'warning');
+        }
+        return;
+    }
+
+    try {
+        const realData = await fetchAppleMusicTrack(song.title, song.artist);
+
+        // The user moved on to a different song while this was in flight — drop the result.
+        if (token !== loadToken) return;
+
+        if (realData && realData.audioUrl) {
+            song.audioUrl = realData.audioUrl;
+            if (realData.cover) song.cover = realData.cover;
+            if (realData.album) song.album = realData.album;
+            song.appleMusicVerified = true;
+
+            // Update database silently
+            let songs = DB.get('songs') || [];
+            const idx = songs.findIndex(s => s.id === song.id);
+            if (idx >= 0) {
+                songs[idx] = song;
+                DB.set('songs', songs);
+            }
+
+            playerState.isLoading = false;
+            playerState.isPlaying = true;
+            renderPlayerBar();
+            if (typeof updateAllPlayButtons === 'function') updateAllPlayButtons();
+
+            audioElement.src = song.audioUrl;
+            audioElement.volume = playerState.isMuted ? 0 : playerState.volume;
+            audioElement.load();
+            await audioElement.play();
+            return;
+        }
+    } catch(e) {
+        console.warn('Apple Music live fetch error:', e);
+    }
+
+    if (finishLoading()) {
+        playerState.isPlaying = false;
         updateAllPlayButtons();
+        showToast(`⚠️ Preview for "${song.title}" is not available right now.`, 'warning');
     }
 }
 
 function togglePlay() {
-    if (!playerState.currentSong) return;
+    if (!playerState.currentSong || playerState.isLoading) return;
     playerState.isPlaying = !playerState.isPlaying;
+
     const btn = document.getElementById('mainPlayBtn');
     if (btn) btn.innerHTML = playerState.isPlaying ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
 
-    if (playerState.isPlaying) playTone();
-    else stopTone();
+    if (playerState.isPlaying) audioElement.play();
+    else audioElement.pause();
+
     updatePlayingHighlight();
-    
-    // Update all play buttons across the UI
-    if (typeof updateAllPlayButtons === 'function') {
-        updateAllPlayButtons();
-    }
+    if (typeof updateAllPlayButtons === 'function') updateAllPlayButtons();
 }
 
 function playNext() {
@@ -136,7 +190,12 @@ function playNext() {
     let idx = playerState.queueIndex + 1;
     if (idx >= playerState.queue.length) {
         if (playerState.repeatMode >= 1) idx = 0;
-        else { playerState.isPlaying = false; stopTone(); clearInterval(progressInterval); return; }
+        else {
+            playerState.isPlaying = false;
+            audioElement.pause();
+            if (typeof updateAllPlayButtons === 'function') updateAllPlayButtons();
+            return;
+        }
     }
     playerState.queueIndex = idx;
     playSong(playerState.queue[idx], null, idx);
@@ -146,6 +205,7 @@ function playPrev() {
     if (playerState.queue.length === 0) return;
     if (playerState.currentTime > 3) {
         playerState.currentTime = 0;
+        audioElement.currentTime = 0;
         updateProgressUI();
         return;
     }
@@ -194,18 +254,19 @@ function toggleRepeat() {
             '<i class="fas fa-repeat"></i>';
         btn.style.position = 'relative';
     }
-    const labels = ['Repeat off', 'Repeat all', 'Repeat one'];
-    showToast(labels[playerState.repeatMode], 'info');
+    showToast(['Repeat off', 'Repeat all', 'Repeat one'][playerState.repeatMode], 'info');
 }
 
 // ========== SEEK ==========
 function seekTrack(e) {
-    if (!playerState.currentSong) return;
+    if (!playerState.currentSong || playerState.isLoading) return;
     const bar = document.getElementById('progressBar');
     if (!bar) return;
     const rect = bar.getBoundingClientRect();
-    const pct = (e.clientX - rect.left) / rect.width;
-    playerState.currentTime = pct * playerState.duration;
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const newTime = pct * playerState.duration;
+    playerState.currentTime = newTime;
+    audioElement.currentTime = newTime;
     updateProgressUI();
 }
 
@@ -219,30 +280,25 @@ function changeVolume(e) {
     playerState.isMuted = pct === 0;
     const fill = document.getElementById('volumeFill');
     if (fill) fill.style.width = (pct * 100) + '%';
-    if (gainNode) gainNode.gain.setValueAtTime(pct * 0.05, audioContext.currentTime);
+
+    audioElement.volume = pct;
     updateVolumeIcon();
 }
 
 function toggleMute() {
     playerState.isMuted = !playerState.isMuted;
-    if (playerState.isMuted) {
-        if (gainNode) gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-        const fill = document.getElementById('volumeFill');
-        if (fill) fill.style.width = '0%';
-    } else {
-        if (gainNode) gainNode.gain.setValueAtTime(playerState.volume * 0.05, audioContext.currentTime);
-        const fill = document.getElementById('volumeFill');
-        if (fill) fill.style.width = (playerState.volume * 100) + '%';
-    }
+    const vol = playerState.isMuted ? 0 : playerState.volume;
+    audioElement.volume = vol;
+    const fill = document.getElementById('volumeFill');
+    if (fill) fill.style.width = (vol * 100) + '%';
     updateVolumeIcon();
 }
 
 function updateVolumeIcon() {
     const btn = document.getElementById('volumeBtn');
     if (!btn) return;
-    const icon = playerState.isMuted || playerState.volume === 0 ? 'fa-volume-xmark' :
-                 playerState.volume < 0.3 ? 'fa-volume-low' :
-                 playerState.volume < 0.7 ? 'fa-volume-low' : 'fa-volume-high';
+    const v = playerState.isMuted ? 0 : playerState.volume;
+    const icon = v === 0 ? 'fa-volume-xmark' : v < 0.5 ? 'fa-volume-low' : 'fa-volume-high';
     btn.innerHTML = `<i class="fas ${icon}"></i>`;
 }
 
@@ -253,31 +309,9 @@ function toggleLikeCurrent() {
     renderPlayerBar();
 }
 
-// ========== UPDATE PLAYING HIGHLIGHT ==========
+// ========== UPDATE PLAYING HIGHLIGHT (overridden by views.js) ==========
 function updatePlayingHighlight() {
-    document.querySelectorAll('.song-row').forEach(r => {
-        const isCurrentSong = r.dataset.songId === playerState.currentSong?.id;
-        r.classList.toggle('playing', isCurrentSong);
-        
-        // Update eq bars and play button
-        const eqBars = r.querySelector('.eq-bars');
-        const playBtn = r.querySelector('.song-play-btn i');
-        const songNum = r.querySelector('.song-num');
-        const numCol = r.querySelector('.song-num-col');
-        
-        if (isCurrentSong) {
-            // Show eq bars, hide number
-            if (songNum) songNum.style.display = 'none';
-            if (eqBars) {
-                eqBars.style.display = 'flex';
-                eqBars.classList.toggle('paused', !playerState.isPlaying);
-            }
-            if (playBtn) playBtn.className = `fas ${playerState.isPlaying ? 'fa-pause' : 'fa-play'}`;
-        } else {
-            // Show number, no eq bars
-            if (songNum) songNum.style.display = '';
-        }
-    });
+    if (typeof updateAllPlayButtons === 'function') updateAllPlayButtons();
 }
 
 // ========== RENDER PLAYER BAR ==========
@@ -292,7 +326,7 @@ function renderPlayerBar() {
     bar.style.display = 'grid';
     bar.innerHTML = `
         <div class="player-track">
-            <div class="player-cover"><img src="${song.cover || getCover(0)}" alt=""></div>
+            <div class="player-cover"><img src="${song.cover || getCover(0)}" alt="" onerror="this.onerror=null;this.src='${getCover(0)}';"></div>
             <div class="player-track-info">
                 <div class="player-track-name">${song.title}</div>
                 <div class="player-track-artist">${song.artist}</div>
@@ -305,8 +339,8 @@ function renderPlayerBar() {
             <div class="player-buttons">
                 <button class="player-btn ${playerState.isShuffle ? 'active' : ''}" id="shuffleBtn" onclick="toggleShuffle()" title="Shuffle"><i class="fas fa-shuffle"></i></button>
                 <button class="player-btn" onclick="playPrev()" title="Previous"><i class="fas fa-backward-step"></i></button>
-                <button class="play-pause-btn" id="mainPlayBtn" onclick="togglePlay()">
-                    <i class="fas ${playerState.isPlaying ? 'fa-pause' : 'fa-play'}"></i>
+                <button class="play-pause-btn" id="mainPlayBtn" onclick="togglePlay()" ${playerState.isLoading ? 'disabled' : ''}>
+                    <i class="fas ${playerState.isLoading ? 'fa-spinner fa-spin' : playerState.isPlaying ? 'fa-pause' : 'fa-play'}"></i>
                 </button>
                 <button class="player-btn" onclick="playNext()" title="Next"><i class="fas fa-forward-step"></i></button>
                 <button class="player-btn ${playerState.repeatMode > 0 ? 'active' : ''}" id="repeatBtn" onclick="toggleRepeat()" title="Repeat">
@@ -318,7 +352,7 @@ function renderPlayerBar() {
                 <div class="progress-bar-container" id="progressBar" onclick="seekTrack(event)">
                     <div class="progress-bar-fill" id="progressFill" style="width:${(playerState.currentTime/playerState.duration*100)||0}%"></div>
                 </div>
-                <span class="player-time" id="totalTime">${song.duration}</span>
+                <span class="player-time" id="totalTime">${secondsToTime(playerState.duration)}</span>
             </div>
         </div>
         <div class="player-extras">
@@ -331,8 +365,33 @@ function renderPlayerBar() {
             </div>
         </div>
     `;
-
     updateVolumeIcon();
+}
+
+// ========== LOAD AUDIO FROM INDEXEDDB ==========
+async function loadAndPlayAudio(song, token) {
+    try {
+        const audioRecord = await getAudioFile(song.id);
+        if (token !== loadToken) return;
+        if (audioRecord && audioRecord.data) {
+            const blob = new Blob([audioRecord.data], { type: audioRecord.type || 'audio/mpeg' });
+            const url = URL.createObjectURL(blob);
+            audioElement.src = url;
+            audioElement.volume = playerState.isMuted ? 0 : playerState.volume;
+            await audioElement.play();
+            console.log('▶️ Playing:', song.title);
+        } else if (token === loadToken) {
+            playerState.isPlaying = false;
+            updateAllPlayButtons();
+            showToast(`⚠️ Audio file for "${song.title}" is not available yet.`, 'warning');
+        }
+    } catch (e) {
+        console.warn('Audio load failed:', e.message);
+        if (token !== loadToken) return;
+        playerState.isPlaying = false;
+        updateAllPlayButtons();
+        showToast(`⚠️ Audio file for "${song.title}" could not be loaded.`, 'warning');
+    }
 }
 
 // ========== DRAG SUPPORT ==========

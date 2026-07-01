@@ -31,3 +31,13 @@ StreamsDB.clear(store)	Clear entire store
 getSetting(key)	Get setting value
 setSetting(key, value)	Save setting
 getDatabaseInfo()	Get DB stats
+
+
+Browser → DevTools (F12) → Application → IndexedDB → StreamsDB
+  ├── audioFiles    ← Your uploaded MP3/WAV/etc binary data
+  ├── coverImages   ← Your uploaded cover art
+  ├── users
+  ├── songs
+  ├── playlists
+  ├── favorites
+  └── setting
