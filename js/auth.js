@@ -172,12 +172,7 @@ function handleLogout() {
     currentUser = null;
     DB.remove('currentUser');
     playerState.isPlaying = false;
-    stopTone();
-    clearInterval(progressInterval);
-    if (audioContext) {
-        try { audioContext.close(); } catch(e) {}
-        audioContext = null;
-    }
+    audioElement.pause();
     showPage('authPage');
     showAuth('login');
     showToast('Logged out successfully', 'info');

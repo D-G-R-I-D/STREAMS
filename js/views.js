@@ -76,7 +76,7 @@ function renderHome(el, songs) {
         <div class="artists-row">
             ${defaultArtists.map((a, i) => `
                 <div class="artist-card" onclick="navigateTo('artist',{name:'${escapeStr(a.name)}',genre:'${escapeStr(a.genre)}'})">
-                    <div class="artist-avatar"><img src="${getArtistImg(i)}" alt="${a.name}" loading="lazy"></div>
+                    <div class="artist-avatar"><img src="${getArtistImg(i)}" alt="${a.name}" loading="lazy" onerror="this.onerror=null;this.src='${getCover(0)}';"></div>
                     <div class="artist-name-label">${a.name}</div>
                     <div class="artist-genre-label">${a.genre.split('/')[0].trim()}</div>
                 </div>
@@ -110,7 +110,7 @@ function renderBrowse(el, songs) {
         <div class="cards-grid" style="grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));">
             ${defaultArtists.map((a, i) => `
                 <div class="music-card" onclick="navigateTo('artist',{name:'${escapeStr(a.name)}',genre:'${escapeStr(a.genre)}'})">
-                    <div class="card-cover"><img src="${getArtistImg(i)}" alt="${a.name}" loading="lazy"></div>
+                    <div class="card-cover"><img src="${getArtistImg(i)}" alt="${a.name}" loading="lazy" onerror="this.onerror=null;this.src='${getCover(0)}';"></div>
                     <div class="card-title">${a.name}</div>
                     <div class="card-subtitle">${a.genre}</div>
                 </div>
@@ -300,7 +300,7 @@ function renderUploads(el) {
             return `
             <div class="playlist-card upload-song-card ${isCur ? 'playing' : ''}" data-song-id="${s.id}">
                 <div class="upload-song-cover" onclick="handleQueuePlay('${s.id}','${qKey}',${idx})">
-                    <img src="${s.cover}" alt="" loading="lazy">
+                    <img src="${s.cover}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${getCover(0)}';">
                     <div class="upload-song-play-overlay"><i class="fas ${isP ? 'fa-pause' : 'fa-play'}"></i></div>
                 </div>
                 <div class="playlist-info" style="cursor:pointer;" onclick="handleQueuePlay('${s.id}','${qKey}',${idx})">
@@ -333,7 +333,7 @@ function renderArtistPage(el, songs, data) {
 
     el.innerHTML = `
         <div class="artist-hero">
-            <div class="artist-hero-avatar"><img src="${img}" alt="${artistName}" loading="lazy"></div>
+            <div class="artist-hero-avatar"><img src="${img}" alt="${artistName}" loading="lazy" onerror="this.onerror=null;this.src='${getCover(0)}';"></div>
             <div class="artist-hero-info">
                 <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.7);letter-spacing:1.5px;text-transform:uppercase;">ARTIST</div>
                 <h1>${artistName}</h1>
@@ -416,7 +416,7 @@ function buildCardGrid(songs) {
         return `
         <div class="music-card ${isCur ? 'playing' : ''}" data-song-id="${song.id}" onclick="handleQueuePlay('${song.id}','${qKey}',${i})">
             <div class="card-cover">
-                <img src="${song.cover || getCover(i)}" alt="${song.title}" loading="lazy">
+                <img src="${song.cover || getCover(i)}" alt="${song.title}" loading="lazy" onerror="this.onerror=null;this.src='${getCover(i)}';">
                 <button class="card-play-btn ${isCur ? 'active' : ''}" onclick="event.stopPropagation();handleQueuePlay('${song.id}','${qKey}',${i})">
                     <i class="fas ${isP ? 'fa-pause' : 'fa-play'}"></i>
                 </button>
@@ -451,7 +451,7 @@ function songList(songs, playlistId) {
                     <i class="fas ${isP ? 'fa-pause' : 'fa-play'}"></i>
                 </button>
             </div>
-            <div class="song-thumb"><img src="${song.cover || getCover(i)}" alt="" loading="lazy"></div>
+            <div class="song-thumb"><img src="${song.cover || getCover(i)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${getCover(i)}';"></div>
             <div><div class="song-title-text">${song.title}</div><div class="song-artist-text">${song.artist}</div></div>
             <div class="song-album-text">${song.album || '—'}</div>
             <div class="song-duration">${song.duration}</div>

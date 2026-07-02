@@ -35,7 +35,7 @@ function renderSettings(el) {
     const user = currentUser;
     const allUsers = DB.get('users') || [];
     const otherUsers = allUsers.filter(u => u.id !== user?.id);
-
+//|| user?.name?.charAt(0).toUpperCase() || 'A'
     el.innerHTML = `
         <div class="section-header">
             <h2 class="section-title"><i class="fas fa-gear"></i> Settings</h2>
@@ -46,7 +46,7 @@ function renderSettings(el) {
             <div class="settings-section-title">Profile</div>
             <div class="settings-card">
                 <div class="profile-header">
-                    <div class="profile-avatar-large">${user?.name?.charAt(0).toUpperCase() || 'A'}</div>
+                    <div class="profile-avatar-large"><img class="user-avatar-img" src="${currentUser?.picture}" alt="" referrerpolicy="no-referrer"></div>
                     <div class="profile-info">
                         <h3>${user?.name || 'User'}</h3>
                         <p>${user?.email || 'email@example.com'}</p>
@@ -216,10 +216,24 @@ function renderSettings(el) {
 
 // ========== STORAGE HELPERS ==========
 function getStorageSize() {
-    const total = DB.getSize();
+    // Combine localStorage + estimate IndexedDB
+    const lsSize = DB.getSize();
+    // We can't synchronously measure IndexedDB, so show localStorage for now
+    const total = lsSize;
     if (total < 1024) return total + ' B';
     if (total < 1024 * 1024) return (total / 1024).toFixed(1) + ' KB';
     return (total / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+// Async version that counts IndexedDB audio files
+async function getFullStorageInfo() {
+    try {
+        const audioCount = await StreamsDB.count('audioFiles');
+        const coverCount = await StreamsDB.count('coverImages');
+        return { audioFiles: audioCount, coverImages: coverCount };
+    } catch(e) {
+        return { audioFiles: 0, coverImages: 0 };
+    }
 }
 
 function clearCache() {
@@ -309,9 +323,8 @@ function switchToAccount(userId) {
     
     // Stop playback
     playerState.isPlaying = false;
-    stopTone();
-    clearInterval(progressInterval);
-    
+    audioElement.pause();
+
     // Reinitialize app
     initApp();
     showToast(`Switched to ${user.name}`, 'success');
@@ -322,10 +335,7 @@ function openAddAccountModal() {
     currentUser = null;
     DB.remove('currentUser');
     playerState.isPlaying = false;
-    if (audioContext) { 
-        try { audioContext.close(); } catch(e) {}
-        audioContext = null; 
-    }
+    audioElement.pause();
     showPage('authPage');
     showAuth('signup');
     showToast('Sign in with another account', 'info');

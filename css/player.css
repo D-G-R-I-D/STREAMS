@@ -15,6 +15,15 @@
     align-items: center;
     gap: 16px;
     box-shadow: var(--shadow-player);
+    margin-left: 12.3%;
+}
+
+@media (max-width: 768px) {
+    .player-bar { margin-left: 0%; }
+}
+
+@media (max-width: 480px) {
+    .player-bar { margin-left: 0%; }
 }
 
 /* Track Info */
