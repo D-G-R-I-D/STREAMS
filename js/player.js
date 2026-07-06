@@ -112,6 +112,51 @@ async function playSong(song, queue, index) {
         showToast(`🎵 Loading "${song.title}"...`, 'info');
         fetchAndPlayAppleMusic(song, token);
     }
+
+    // Warm up the next song in the queue in the background so ⏭ / auto-advance is instant
+    // instead of showing a loading spinner while we fetch its preview URL on demand.
+    preloadNextTrack();
+}
+
+// Resolve & cache the next queued track's audio ahead of time (audio URL + album art),
+// then prime the browser's media cache with the actual preview bytes. Fully best-effort:
+// any failure is silent and never affects the currently playing song.
+async function preloadNextTrack() {
+    const q = playerState.queue;
+    if (!q || q.length === 0) return;
+
+    let nextIdx = playerState.queueIndex + 1;
+    if (nextIdx >= q.length) {
+        if (playerState.repeatMode >= 1) nextIdx = 0;
+        else return;
+    }
+
+    const next = q[nextIdx];
+    // Already playable (uploaded file or a resolved preview) — nothing to warm up.
+    if (!next || next.hasAudio || next.audioUrl) {
+        if (next && next.audioUrl) { try { new Audio().src = next.audioUrl; } catch (e) {} }
+        return;
+    }
+    if (typeof fetchAppleMusicTrack !== 'function') return;
+
+    try {
+        const data = await fetchAppleMusicTrack(next.title, next.artist);
+        if (!data || !data.audioUrl) return;
+
+        next.audioUrl = data.audioUrl;
+        if (data.cover) next.cover = data.cover;
+        if (data.album) next.album = data.album;
+        if (data.duration) next.duration = data.duration;
+        next.appleMusicVerified = true;
+
+        // Persist so this resolution survives navigation and future sessions.
+        let songs = DB.get('songs') || [];
+        const idx = songs.findIndex(s => s.id === next.id);
+        if (idx >= 0) { songs[idx] = next; DB.set('songs', songs); }
+
+        // Prime the actual preview bytes so playback starts immediately when it's this song's turn.
+        try { const a = new Audio(); a.preload = 'auto'; a.src = next.audioUrl; } catch (e) {}
+    } catch (e) {}
 }
 
 async function fetchAndPlayAppleMusic(song, token) {

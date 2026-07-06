@@ -55,6 +55,11 @@ function renderView(view, data) {
         case 'settings': renderSettings(el); break;
         default: renderHome(el, songs);
     }
+    // Jump whatever just landed on screen to the front of the enrichment queue so the
+    // first song the user is likely to click already has real audio + art ready.
+    if (typeof prioritizeVisibleEnrichment === 'function') {
+        setTimeout(prioritizeVisibleEnrichment, 0);
+    }
 }
 
 // ========== HOME ==========
