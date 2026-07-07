@@ -6,6 +6,17 @@
     <title>STREAMS — Premium Music Streaming</title>
     <link rel="icon" type="image/png" href="public/images/STREAMS_LOGO.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <!-- Warm up the music/artwork/audio hosts so first cover + first preview don't pay a cold DNS+TLS handshake -->
+    <link rel="preconnect" href="https://itunes.apple.com" crossorigin>
+    <link rel="preconnect" href="https://is1-ssl.mzstatic.com" crossorigin>
+    <link rel="preconnect" href="https://audio-ssl.itunes.apple.com" crossorigin>
+    <link rel="dns-prefetch" href="https://itunes.apple.com">
+    <link rel="dns-prefetch" href="https://is2-ssl.mzstatic.com">
+    <link rel="dns-prefetch" href="https://is3-ssl.mzstatic.com">
+    <link rel="dns-prefetch" href="https://is4-ssl.mzstatic.com">
+    <link rel="dns-prefetch" href="https://is5-ssl.mzstatic.com">
+    <link rel="dns-prefetch" href="https://api.deezer.com">
+    <link rel="dns-prefetch" href="https://corsproxy.io">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <!-- Firebase SDKs -->

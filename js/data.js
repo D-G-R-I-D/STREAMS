@@ -104,7 +104,43 @@ const defaultArtists = [
     { name: 'Lana Del Rey', genre: 'Baroque Pop / Dream Pop' },
     { name: 'Khalid', genre: 'PBR&B / Neo-Soul Pop' },
     { name: 'BTS', genre: 'K-Pop / Dance-Pop' },
-    { name: 'Halsey', genre: 'Electropop / Alternative Pop' }
+    { name: 'Halsey', genre: 'Electropop / Alternative Pop' },
+
+    // ===== Afrobeats / Afro-Fusion =====
+    { name: 'Burna Boy', genre: 'Afrobeats / Afro-Fusion' },
+    { name: 'Wizkid', genre: 'Afrobeats / Alté' },
+    { name: 'Davido', genre: 'Afrobeats / Afropop' },
+    { name: 'Rema', genre: 'Afrobeats / Afro-Rave' },
+    { name: 'Tems', genre: 'Afrobeats / Alt-R&B' },
+    { name: 'Ayra Starr', genre: 'Afrobeats / Afropop' },
+    { name: 'Asake', genre: 'Afrobeats / Amapiano-Fusion' },
+    { name: 'ODUMODUBLVCK', genre: 'Nigerian Drill / Afrobeats' },
+
+    // ===== Classical & Neoclassical =====
+    { name: 'Ludovico Einaudi', genre: 'Neoclassical / Contemporary' },
+    { name: 'Yiruma', genre: 'Neoclassical / Piano' },
+    { name: 'Ludwig van Beethoven', genre: 'Classical / Romantic' },
+    { name: 'Frédéric Chopin', genre: 'Classical / Romantic' },
+    { name: 'Claude Debussy', genre: 'Classical / Impressionist' },
+    { name: 'Antonio Vivaldi', genre: 'Classical / Baroque' },
+
+    // ===== Hip-Hop / Rap =====
+    { name: 'Kendrick Lamar', genre: 'Hip-Hop / Conscious Rap' },
+    { name: 'Drake', genre: 'Hip-Hop / R&B' },
+
+    // ===== Rock / Alternative =====
+    { name: 'Coldplay', genre: 'Alt-Rock / Pop-Rock' },
+    { name: 'Imagine Dragons', genre: 'Pop-Rock / Alt-Rock' },
+
+    // ===== Latin / Reggaeton =====
+    { name: 'Bad Bunny', genre: 'Latin / Reggaeton' },
+
+    // ===== Electronic / Dance =====
+    { name: 'Calvin Harris', genre: 'EDM / Dance-Pop' },
+    { name: 'Avicii', genre: 'EDM / Progressive House' },
+
+    // ===== R&B / Soul =====
+    { name: 'SZA', genre: 'R&B / Alt-R&B' }
 ];
 
 // ========== DEFAULT SONGS ==========
@@ -183,11 +219,82 @@ const defaultSongsData = [
     ['Eastside (with Benny Blanco)','Halsey','Eastside','2:53'],['Bad At Love','Halsey','hopeless fountain kingdom','3:01'],
     ['Him & I','Halsey','Beautiful & Damned','4:28'],['You should be sad','Halsey','Manic','3:25'],
     ['Graveyard','Halsey','Manic','3:01'],['Gasoline','Halsey',"If I Can't Have Love",'3:19'],
-    ['Sorry','Halsey','Badlands','3:40'],['New Americana','Halsey','Badlands','3:03']
+    ['Sorry','Halsey','Badlands','3:40'],['New Americana','Halsey','Badlands','3:03'],
+
+    // ===== Afrobeats =====
+    ['Last Last','Burna Boy','Love, Damini','3:41'],['Ye','Burna Boy','Outside','3:20'],
+    ['On The Low','Burna Boy','African Giant','3:07'],['City Boys','Burna Boy','I Told Them...','2:52'],
+    ['Kilometre','Burna Boy','Twice As Tall','3:11'],['For My Hand','Burna Boy','Love, Damini','3:26'],
+    ['Essence','Wizkid','Made in Lagos','4:08'],['Ojuelegba','Wizkid','Ayo','3:20'],
+    ['Come Closer','Wizkid','Sounds from the Other Side','3:33'],['Bad To Me','Wizkid','More Love, Less Ego','3:04'],
+    ['Ginger','Wizkid','Made in Lagos','3:04'],['Money & Love','Wizkid','More Love, Less Ego','3:38'],
+    ['Fall','Davido','A Good Time','4:15'],['Unavailable','Davido','Timeless','3:03'],
+    ['Feel','Davido','Timeless','2:58'],['If','Davido','A Good Time','3:59'],
+    ['FEM','Davido','A Better Time','2:35'],['Aye','Davido','Aye','3:56'],
+    ['Calm Down','Rema','Rave & Roses','3:59'],['Dumebi','Rema','Rema','2:52'],
+    ['Holiday','Rema','Rave & Roses','2:39'],['Charm','Rema','HEIS','2:11'],
+    ['Ozeba','Rema','HEIS','2:15'],['Soundgasm','Rema','Rave & Roses Ultra','2:23'],
+    ['Free Mind','Tems','For Broken Ears','4:14'],['Me & U','Tems','Born in the Wild','3:12'],
+    ['Love Me JeJe','Tems','Born in the Wild','3:15'],['Higher','Tems','If Orange Was a Place','3:39'],
+    ['Try Me','Tems','For Broken Ears','3:11'],
+    ['Rush','Ayra Starr','19 & Dangerous','3:04'],['Sability','Ayra Starr','Sability','2:44'],
+    ['Commas','Ayra Starr','The Year I Turned 21','2:38'],['Bloody Samaritan','Ayra Starr','19 & Dangerous','3:19'],
+    ['Away','Ayra Starr','19 & Dangerous','3:04'],
+    ['Lonely At The Top','Asake','Work of Art','2:31'],['Joha','Asake','Mr. Money With the Vibe','2:44'],
+    ['Sungba','Asake','Mr. Money With the Vibe','2:43'],['Terminator','Asake','Work of Art','2:48'],
+    ['Organise','Asake','Mr. Money With the Vibe','3:12'],['Amapiano','Asake','Amapiano','2:36'],
+    ['Declan Rice','ODUMODUBLVCK','Eziokwu','2:37'],['Blood On The Dance Floor','ODUMODUBLVCK','Eziokwu','2:29'],
+    ['Dog Eat Dog II','ODUMODUBLVCK','Eziokwu','2:41'],['Firegun','ODUMODUBLVCK','Eziokwu','2:33'],
+    ['Wotowoto Seasoning','ODUMODUBLVCK','Eziokwu','2:22'],['Pity This Boys','ODUMODUBLVCK','Eziokwu','2:18'],
+
+    // ===== Classical & Neoclassical =====
+    ['Nuvole Bianche','Ludovico Einaudi','Una Mattina','5:57'],['Experience','Ludovico Einaudi','In a Time Lapse','5:15'],
+    ['Una Mattina','Ludovico Einaudi','Una Mattina','3:20'],['Divenire','Ludovico Einaudi','Divenire','6:42'],
+    ['Le Onde','Ludovico Einaudi','Le Onde','4:43'],
+    ['River Flows in You','Yiruma','First Love','3:08'],['Kiss the Rain','Yiruma','From the Yellow Room','4:16'],
+    ['May Be','Yiruma','First Love','4:00'],
+    ['Für Elise','Ludwig van Beethoven','Bagatelle No. 25','2:58'],['Moonlight Sonata','Ludwig van Beethoven','Piano Sonata No. 14','5:30'],
+    ['Symphony No. 5','Ludwig van Beethoven','Symphony No. 5 in C Minor','7:20'],
+    ['Nocturne in E-flat Major','Frédéric Chopin','Nocturnes, Op. 9','4:33'],['Prelude in E Minor','Frédéric Chopin','Preludes, Op. 28','2:10'],
+    ['Clair de Lune','Claude Debussy','Suite Bergamasque','5:00'],
+    ['Spring','Antonio Vivaldi','The Four Seasons','3:14'],['Winter','Antonio Vivaldi','The Four Seasons','3:20'],
+
+    // ===== Hip-Hop / Rap =====
+    ['HUMBLE.','Kendrick Lamar','DAMN.','2:57'],['Money Trees','Kendrick Lamar','good kid, m.A.A.d city','6:26'],
+    ['Not Like Us','Kendrick Lamar','Not Like Us','4:34'],['DNA.','Kendrick Lamar','DAMN.','3:06'],
+    ['Alright','Kendrick Lamar','To Pimp a Butterfly','3:39'],['luther','Kendrick Lamar','GNX','2:57'],
+    ["God's Plan",'Drake','Scorpion','3:18'],['One Dance','Drake','Views','2:53'],
+    ['Hotline Bling','Drake','Views','4:27'],['Passionfruit','Drake','More Life','4:59'],
+    ['Nice For What','Drake','Scorpion','3:30'],['In My Feelings','Drake','Scorpion','3:37'],
+
+    // ===== Rock / Alternative =====
+    ['Yellow','Coldplay','Parachutes','4:29'],['Viva La Vida','Coldplay','Viva la Vida or Death and All His Friends','4:01'],
+    ['Fix You','Coldplay','X&Y','4:55'],['The Scientist','Coldplay','A Rush of Blood to the Head','5:09'],
+    ['Paradise','Coldplay','Mylo Xyloto','4:38'],['A Sky Full of Stars','Coldplay','Ghost Stories','4:28'],
+    ['Believer','Imagine Dragons','Evolve','3:24'],['Radioactive','Imagine Dragons','Night Visions','3:06'],
+    ['Thunder','Imagine Dragons','Evolve','3:07'],['Demons','Imagine Dragons','Night Visions','2:57'],
+    ['Enemy','Imagine Dragons','Mercury – Act 1','2:53'],['Bones','Imagine Dragons','Mercury – Act 2','2:45'],
+
+    // ===== Latin / Reggaeton =====
+    ['Tití Me Preguntó','Bad Bunny','Un Verano Sin Ti','4:03'],['Me Porto Bonito','Bad Bunny','Un Verano Sin Ti','2:58'],
+    ['Dákiti','Bad Bunny','El Último Tour Del Mundo','3:25'],['MONACO','Bad Bunny','nadie sabe lo que va a pasar mañana','4:13'],
+    ['Yonaguni','Bad Bunny','Yonaguni','3:26'],['DtMF','Bad Bunny','DeBÍ TiRAR MáS FOToS','3:57'],
+
+    // ===== Electronic / Dance =====
+    ['Summer','Calvin Harris','Motion','3:43'],['Feel So Close','Calvin Harris','18 Months','3:26'],
+    ['This Is What You Came For','Calvin Harris','This Is What You Came For','3:42'],['Slide','Calvin Harris','Funk Wav Bounces Vol. 1','3:50'],
+    ['Wake Me Up','Avicii','True','4:07'],['Levels','Avicii','Levels','3:19'],
+    ['Hey Brother','Avicii','True','4:15'],['The Nights','Avicii','The Days / Nights','2:56'],
+    ['Waiting For Love','Avicii','Stories','3:50'],
+
+    // ===== R&B / Soul =====
+    ['Kill Bill','SZA','SOS','2:33'],['Snooze','SZA','SOS','3:21'],
+    ['Good Days','SZA','SOS','4:39'],['Saturn','SZA','Lana','3:03'],
+    ['Nobody Gets Me','SZA','SOS','3:01']
 ];
 
 // ========== INITIALIZE DEFAULT SONGS ==========
-const SONGS_DATA_VERSION = 4;
+const SONGS_DATA_VERSION = 6;
 
 function initDefaultSongs() {
     // Force re-seed if version bumped
@@ -276,6 +383,65 @@ async function enrichSongsWithRealData(options = {}) {
     if (pendingSongs.length > batch.length) {
         setTimeout(() => enrichSongsWithRealData({ limit, force: false }), 300);
     }
+}
+
+// ========== PRIORITY (ON-SCREEN) ENRICHMENT ==========
+// Songs we've already kicked off a priority fetch for, so the constant re-renders
+// don't fire duplicate network requests for the same track.
+const _priorityRequested = new Set();
+
+// Enrich a specific set of songs right now, ahead of the slow background sweep.
+// Called with whatever is currently visible on screen so the first thing a user is
+// likely to click already has its real audio + cover before they click it.
+async function enrichVisibleSongs(visibleSongs) {
+    if (!Array.isArray(visibleSongs) || typeof fetchAppleMusicTrack !== 'function') return;
+
+    const targets = visibleSongs.filter(s => s && shouldRefreshSong(s) && !_priorityRequested.has(s.id));
+    if (targets.length === 0) return;
+    targets.forEach(s => _priorityRequested.add(s.id));
+
+    let updated = false;
+
+    await runWithConcurrency(targets, async (song) => {
+        try {
+            const data = await fetchAppleMusicTrack(song.title, song.artist);
+            if (data) {
+                if (data.audioUrl) song.audioUrl = data.audioUrl;
+                if (data.cover) song.cover = data.cover;
+                if (data.album) song.album = data.album;
+                if (data.duration) song.duration = data.duration;
+                song.appleMusicVerified = true;
+                updated = true;
+            }
+        } catch (e) {}
+    }, 4);
+
+    if (!updated) return;
+
+    // Re-read right before writing and merge, so we don't clobber whatever the
+    // background sweep resolved in the meantime.
+    let songs = DB.get('songs') || [];
+    targets.forEach(t => {
+        const idx = songs.findIndex(s => s.id === t.id);
+        if (idx >= 0) songs[idx] = { ...songs[idx], ...t };
+    });
+    DB.set('songs', songs);
+    preloadSongCovers(targets);
+    if (typeof renderView === 'function') {
+        renderView(currentView, typeof currentViewData !== 'undefined' ? currentViewData : null);
+    }
+}
+
+// Scan the just-rendered DOM for playable songs and prioritize enriching them.
+// View-agnostic: any card/row/upload tile carrying data-song-id gets picked up.
+function prioritizeVisibleEnrichment() {
+    const ids = new Set();
+    document.querySelectorAll('[data-song-id]').forEach(el => {
+        if (el.dataset.songId) ids.add(el.dataset.songId);
+    });
+    if (ids.size === 0) return;
+    const visible = getAllSongs().filter(s => ids.has(s.id));
+    enrichVisibleSongs(visible);
 }
 
 // Force refresh (call from console: reloadAllMusicData())
