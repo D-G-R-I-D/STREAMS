@@ -2,7 +2,7 @@
 .player-bar {
     position: fixed;
     bottom: 0;
-    left: 0; right: 0;
+    left: 260px; right: 0;
     z-index: 50;
     background: var(--bg-player);
     -webkit-backdrop-filter: blur(30px);
@@ -15,15 +15,14 @@
     align-items: center;
     gap: 16px;
     box-shadow: var(--shadow-player);
-    margin-left: 12.3%;
 }
 
 @media (max-width: 768px) {
-    .player-bar { margin-left: 0%; }
+    .player-bar { left: 0; }
 }
 
 @media (max-width: 480px) {
-    .player-bar { margin-left: 0%; }
+    .player-bar { left: 0; }
 }
 
 /* Track Info */
