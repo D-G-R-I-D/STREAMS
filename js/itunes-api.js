@@ -103,6 +103,42 @@ function itunesJSONP(query, entity, limit) {
     });
 }
 
+/**
+ * Core JSONP request to the Deezer API.
+ * Deezer sends NO CORS headers, so a plain browser fetch() to it is blocked — JSONP
+ * (output=jsonp&callback=) is the only way to reach it from the browser without a backend.
+ * Crucially, Deezer tolerates burst load far better than iTunes (which returns HTTP 429
+ * after a handful of enrichment requests), so this is our primary enrichment source.
+ * `path` is 'search' for tracks or 'search/artist' for artists.
+ */
+function deezerJSONP(path, query, limit) {
+    return new Promise((resolve) => {
+        const cbName = '_dzcb' + (++_jsonpId) + '_' + Math.round(Math.random() * 99999);
+        const script = document.createElement('script');
+        const encoded = encodeURIComponent(query);
+        script.src = `https://api.deezer.com/${path}?q=${encoded}&limit=${limit}&output=jsonp&callback=${cbName}`;
+
+        const timeout = setTimeout(() => { cleanup(); resolve(null); }, JSONP_TIMEOUT_MS);
+
+        function cleanup() {
+            clearTimeout(timeout);
+            delete window[cbName];
+            if (script.parentNode) script.parentNode.removeChild(script);
+        }
+
+        window[cbName] = function(payload) {
+            cleanup();
+            // Deezer signals throttling with { error: { code, message } } — treat as no data
+            // so the (short-lived) negative cache lets it retry shortly.
+            if (payload && payload.error) return resolve(null);
+            resolve(payload && Array.isArray(payload.data) ? payload.data : null);
+        };
+
+        script.onerror = () => { cleanup(); resolve(null); };
+        document.head.appendChild(script);
+    });
+}
+
 async function itunesFetchViaProxy(query, entity, limit) {
     const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=${entity}&limit=${limit}&country=US&lang=en_us`;
     const candidates = [
@@ -146,17 +182,16 @@ async function fetchDeezerTrack(title, artist) {
 
     try {
         const query = `${title} ${artist}`.trim();
-        const response = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(query)}`);
-        if (!response.ok) return null;
-        const data = await response.json();
-        const track = (data.data || []).find(item => item?.preview) || data.data?.[0] || null;
+        const data = await deezerJSONP('search', query, 5);
+        if (!data) return null;
+        const track = data.find(item => item?.preview) || data[0] || null;
         if (!track) return null;
 
         const result = {
             audioUrl: track.preview || null,
             cover: track.album?.cover_xl || track.album?.cover_big || null,
             album: track.album?.title || null,
-            duration: track.duration ? Math.floor(track.duration / 60) + ':' + (track.duration % 60 < 10 ? '0' : '') + (track.duration % 60) : null
+            duration: track.duration ? formatTrackDuration(track.duration) : null
         };
         DEEZER_CACHE[cacheKey] = result;
         return result;
@@ -170,45 +205,43 @@ async function fetchAppleMusicTrack(title, artist) {
     if (ITUNES_CACHE[cacheKey]) return ITUNES_CACHE[cacheKey];
     if (NEGATIVE_CACHE[cacheKey] && Date.now() - NEGATIVE_CACHE[cacheKey] < NEGATIVE_TTL_MS) return null;
 
-    // Fire the top search queries concurrently instead of one-at-a-time — this is what let
-    // a single lookup take 10-60s before (sequential queries x sequential entity fallbacks).
-    // Capped at 2 (not more) to avoid tripping iTunes' per-IP rate limit under enrichment load.
-    const searchQueries = buildAppleMusicSearchQueries(title, artist).slice(0, 2);
-    const resultSets = await Promise.all(searchQueries.map(async (query) => {
-        let results = await itunesJSONP(query, 'song', 6);
-        if (!results || results.length === 0) {
-            results = await itunesFetchViaProxy(query, 'song', 6);
-        }
-        return results || [];
-    }));
+    // Deezer FIRST. It's CORS-free via JSONP and tolerates burst enrichment load, whereas
+    // iTunes returns HTTP 429 after only a handful of requests — which is why previously only
+    // the first couple of songs ever got real audio/art and the rest stayed on placeholders.
+    let result = await fetchDeezerTrack(title, artist);
 
-    let bestMatch = null;
-    for (const results of resultSets) {
-        for (const result of results) {
-            const score = scoreAppleMusicResult(result, title, artist);
-            if (score > 0 && (!bestMatch || score > bestMatch.score)) {
-                bestMatch = { result, score };
+    // Only bother iTunes if Deezer came back without a usable preview. This keeps iTunes
+    // request volume tiny, so it doesn't rate-limit us.
+    if (!result || !result.audioUrl) {
+        const searchQueries = buildAppleMusicSearchQueries(title, artist).slice(0, 2);
+        const resultSets = await Promise.all(searchQueries.map(async (query) => {
+            let results = await itunesJSONP(query, 'song', 6);
+            if (!results || results.length === 0) {
+                results = await itunesFetchViaProxy(query, 'song', 6);
+            }
+            return results || [];
+        }));
+
+        let bestMatch = null;
+        for (const results of resultSets) {
+            for (const r of results) {
+                const score = scoreAppleMusicResult(r, title, artist);
+                if (score > 0 && (!bestMatch || score > bestMatch.score)) {
+                    bestMatch = { result: r, score };
+                }
             }
         }
-    }
 
-    let result = null;
-    if (bestMatch) {
-        const match = bestMatch.result;
-        const cover = toHighResArtwork(match.artworkUrl100);
-        const secs = match.trackTimeMillis ? Math.round(match.trackTimeMillis / 1000) : null;
-        const duration = secs
-            ? Math.floor(secs / 60) + ':' + (secs % 60 < 10 ? '0' : '') + (secs % 60)
-            : null;
-
-        result = {
-            audioUrl: match.previewUrl || null,
-            cover: cover,
-            album: match.collectionName || null,
-            duration: duration
-        };
-    } else {
-        result = await fetchDeezerTrack(title, artist);
+        if (bestMatch) {
+            const match = bestMatch.result;
+            const secs = match.trackTimeMillis ? Math.round(match.trackTimeMillis / 1000) : null;
+            result = {
+                audioUrl: match.previewUrl || null,
+                cover: toHighResArtwork(match.artworkUrl100),
+                album: match.collectionName || null,
+                duration: formatTrackDuration(secs)
+            };
+        }
     }
 
     if (result) {
@@ -228,10 +261,9 @@ async function fetchDeezerArtistImage(artistName) {
     if (DEEZER_CACHE[cacheKey]) return DEEZER_CACHE[cacheKey];
 
     try {
-        const response = await fetch(`https://api.deezer.com/search/artist?q=${encodeURIComponent(artistName)}`);
-        if (!response.ok) return null;
-        const data = await response.json();
-        const artist = data.data?.[0];
+        const data = await deezerJSONP('search/artist', artistName, 3);
+        if (!data) return null;
+        const artist = data[0];
         const img = artist?.picture_xl || artist?.picture_big || artist?.picture_medium || null;
         if (img) DEEZER_CACHE[cacheKey] = img;
         return img;
@@ -244,10 +276,16 @@ async function fetchArtistImage(artistName) {
     const cacheKey = 'artist_' + artistName.toLowerCase().trim();
     if (ITUNES_CACHE[cacheKey]) return ITUNES_CACHE[cacheKey];
 
-    const queries = buildAppleMusicSearchQueries(artistName, '').slice(0, 2);
+    // Deezer first — its artist endpoint returns proper artist photos and it doesn't
+    // rate-limit us the way iTunes does under the burst of loading every artist row.
+    const deezerImg = await fetchDeezerArtistImage(artistName);
+    if (deezerImg) {
+        ITUNES_CACHE[cacheKey] = deezerImg;
+        return deezerImg;
+    }
 
-    // Run the artist-entity and song-entity lookups for every query concurrently
-    // instead of sequentially — this was the slowest part of populating artist rows.
+    // Fallback: iTunes artist/song artwork.
+    const queries = buildAppleMusicSearchQueries(artistName, '').slice(0, 2);
     const [artistResultSets, songResultSets] = await Promise.all([
         Promise.all(queries.map(async (query) => {
             let results = await itunesJSONP(query, 'musicArtist', 3);
@@ -271,11 +309,7 @@ async function fetchArtistImage(artistName) {
         return img;
     }
 
-    const fallbackImg = await fetchDeezerArtistImage(artistName);
-    if (fallbackImg) {
-        ITUNES_CACHE[cacheKey] = fallbackImg;
-    }
-    return fallbackImg;
+    return null;
 }
 
 // ==========================================================
@@ -327,10 +361,8 @@ function deezerResultToSong(track) {
 
 async function searchDeezerCatalog(query, limit) {
     try {
-        const response = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=${limit}`);
-        if (!response.ok) return [];
-        const data = await response.json();
-        return (data.data || []).map(deezerResultToSong).filter(Boolean);
+        const data = await deezerJSONP('search', query, limit);
+        return (data || []).map(deezerResultToSong).filter(Boolean);
     } catch (e) {
         return [];
     }
