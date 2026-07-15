@@ -297,8 +297,11 @@ const defaultSongsData = [
 const SONGS_DATA_VERSION = 6;
 
 function initDefaultSongs() {
-    // Force re-seed if version bumped
+    // Force re-seed if version bumped, keeping anything the user owns —
+    // their uploads and the catalog songs they saved are not ours to drop.
+    let preserved = [];
     if (DB.get('songsDataVersion') !== SONGS_DATA_VERSION) {
+        preserved = (DB.get('songs') || []).filter(s => s.uploadedBy !== 'system');
         DB.remove('songs');
         DB.set('songsDataVersion', SONGS_DATA_VERSION);
     }
@@ -323,7 +326,7 @@ function initDefaultSongs() {
         uploadedBy: 'system',
         createdAt: Date.now(),
         plays: Math.floor(Math.random() * 500000000) + 1000000,
-    }));
+    })).concat(preserved);
     DB.set('songs', songs);
     preloadSongCovers(songs);
     setTimeout(() => enrichSongsWithRealData({ limit: 80 }), 0);
@@ -456,6 +459,37 @@ async function reloadAllMusicData() {
     await fetchAllArtistImages();
     await enrichSongsWithRealData({ limit: 60, force: true });
     showToast('✅ All music data refreshed', 'success');
+}
+
+// ========== LIVE CATALOG SONGS ==========
+// Songs pulled straight from the Apple Music/Deezer catalog by a search. They live in
+// memory only until the user acts on one (favorite / add to playlist), at which point
+// they're written into the library so the reference survives a reload.
+const catalogSongIndex = {};
+
+function rememberCatalogSongs(songs) {
+    (songs || []).forEach(song => { catalogSongIndex[song.id] = song; });
+}
+
+// Resolve a song id against the stored library first, then the live catalog results.
+// Every play/queue path goes through this so catalog songs are playable without
+// being saved into the library.
+function findSongById(id) {
+    return getAllSongs().find(s => s.id === id) || catalogSongIndex[id] || null;
+}
+
+// Persist a catalog song into the library. Called before anything stores a bare song id
+// (favorites, playlists), because those views resolve ids against stored songs.
+function saveCatalogSongToLibrary(songId) {
+    const songs = getAllSongs();
+    if (songs.some(s => s.id === songId)) return true;
+
+    const song = catalogSongIndex[songId];
+    if (!song) return false;
+
+    songs.push({ ...song, savedAt: Date.now() });
+    DB.set('songs', songs);
+    return true;
 }
 
 // ========== DATA ACCESSORS ==========

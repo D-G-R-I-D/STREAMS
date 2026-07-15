@@ -16,6 +16,9 @@ function toggleFavorite(songId) {
         favIds = favIds.filter(id => id !== songId);
         showToast('Removed from favorites', 'info');
     } else {
+        // Favorites are stored as bare ids and resolved against the library, so a song
+        // that only exists in live catalog results has to be saved before it's referenced.
+        saveCatalogSongToLibrary(songId);
         favIds.push(songId);
         showToast('Added to favorites', 'success');
     }
@@ -92,6 +95,7 @@ function addSongToPlaylist(songId, playlistId) {
     const pl = playlists.find(p => p.id === playlistId);
     if (!pl) return;
     if (pl.songs.includes(songId)) { showToast('Song already in playlist', 'info'); return; }
+    saveCatalogSongToLibrary(songId);
     pl.songs.push(songId);
     DB.set('playlists_' + currentUser.id, playlists);
     showToast('Added to ' + pl.name, 'success');

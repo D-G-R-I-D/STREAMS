@@ -7,6 +7,8 @@ const ITUNES_CACHE = {};
 const DEEZER_CACHE = {};
 const NEGATIVE_CACHE = {}; // remembers lookups that found nothing, so we don't re-hit the network every retry
 const NEGATIVE_TTL_MS = 10 * 60 * 1000;
+const CATALOG_SEARCH_CACHE = {};
+const CATALOG_SEARCH_TTL_MS = 5 * 60 * 1000;
 let _jsonpId = 0;
 
 function normalizeAppleText(value) {
@@ -57,6 +59,12 @@ function scoreAppleMusicResult(result, title, artist) {
 
 function toHighResArtwork(url) {
     return url ? url.replace('100x100bb', '600x600bb') : null;
+}
+
+function formatTrackDuration(seconds) {
+    if (!seconds && seconds !== 0) return null;
+    const secs = Math.round(seconds);
+    return Math.floor(secs / 60) + ':' + (secs % 60 < 10 ? '0' : '') + (secs % 60);
 }
 
 /**
@@ -261,6 +269,101 @@ async function fetchArtistImage(artistName) {
         ITUNES_CACHE[cacheKey] = fallbackImg;
     }
     return fallbackImg;
+}
+
+// ==========================================================
+//  LIVE CATALOG SEARCH
+//  Free-text search across the whole Apple Music catalog (falling back to Deezer),
+//  so the app isn't limited to the songs seeded into local storage.
+// ==========================================================
+
+function appleResultToSong(result) {
+    const trackId = result.trackId || result.collectionId;
+    if (!trackId || !result.trackName || !result.previewUrl) return null;
+
+    return {
+        id: 'apple_' + trackId,
+        title: result.trackName,
+        artist: result.artistName || 'Unknown Artist',
+        album: result.collectionName || '',
+        duration: formatTrackDuration(result.trackTimeMillis ? result.trackTimeMillis / 1000 : null) || '0:30',
+        genre: result.primaryGenreName || 'Music',
+        cover: toHighResArtwork(result.artworkUrl100),
+        audioUrl: result.previewUrl,
+        uploadedBy: 'catalog',
+        createdAt: Date.now(),
+        plays: 0,
+        appleMusicVerified: true,
+        fromCatalog: true
+    };
+}
+
+function deezerResultToSong(track) {
+    if (!track || !track.id || !track.preview) return null;
+
+    return {
+        id: 'deezer_' + track.id,
+        title: track.title || track.title_short || 'Unknown',
+        artist: track.artist?.name || 'Unknown Artist',
+        album: track.album?.title || '',
+        duration: formatTrackDuration(track.duration) || '0:30',
+        genre: 'Music',
+        cover: track.album?.cover_xl || track.album?.cover_big || null,
+        audioUrl: track.preview,
+        uploadedBy: 'catalog',
+        createdAt: Date.now(),
+        plays: 0,
+        appleMusicVerified: false,
+        fromCatalog: true
+    };
+}
+
+async function searchDeezerCatalog(query, limit) {
+    try {
+        const response = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=${limit}`);
+        if (!response.ok) return [];
+        const data = await response.json();
+        return (data.data || []).map(deezerResultToSong).filter(Boolean);
+    } catch (e) {
+        return [];
+    }
+}
+
+/**
+ * Search the live music catalog by free text (song title, artist, album...).
+ * Only returns tracks that carry a playable preview URL.
+ * Returns: array of song objects shaped like the ones in local storage.
+ */
+async function searchMusicCatalog(query, limit = 25) {
+    const term = String(query || '').trim();
+    if (term.length < 2) return [];
+
+    const cacheKey = term.toLowerCase() + '|' + limit;
+    const cached = CATALOG_SEARCH_CACHE[cacheKey];
+    if (cached && Date.now() - cached.at < CATALOG_SEARCH_TTL_MS) return cached.songs;
+
+    let results = await itunesJSONP(term, 'song', limit);
+    if (!results || results.length === 0) {
+        results = await itunesFetchViaProxy(term, 'song', limit);
+    }
+
+    let songs = (results || []).map(appleResultToSong).filter(Boolean);
+    if (songs.length === 0) {
+        songs = await searchDeezerCatalog(term, limit);
+    }
+
+    // iTunes returns the same track once per release (single, album, deluxe...) —
+    // collapse those so the results read as distinct songs.
+    const seen = new Set();
+    songs = songs.filter(song => {
+        const key = normalizeAppleText(song.title) + '|' + normalizeAppleText(song.artist);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+
+    CATALOG_SEARCH_CACHE[cacheKey] = { at: Date.now(), songs };
+    return songs;
 }
 
 console.log('🍎 iTunes API engine loaded (JSONP mode)');
