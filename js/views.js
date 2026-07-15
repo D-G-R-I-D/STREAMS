@@ -17,7 +17,7 @@ function registerQueue(songIds) {
 }
 
 function getRegisteredQueue(key) {
-    return (_queues[key] || []).map(id => getAllSongs().find(s => s.id === id)).filter(Boolean);
+    return (_queues[key] || []).map(id => findSongById(id)).filter(Boolean);
 }
 
 // ========== NAVIGATION ==========
@@ -128,9 +128,47 @@ function renderBrowse(el, songs) {
 }
 
 // ========== SEARCH ==========
+// Live catalog results for the query currently on screen. renderSearch() is re-run on
+// every background enrichment pass, so results are kept here rather than refetched.
+const catalogSearch = { query: '', status: 'idle', results: [], token: 0 };
+let _catalogSearchTimer = null;
+
+function songMatchKey(song) {
+    return normalizeAppleText(song.title) + '|' + normalizeAppleText(song.artist);
+}
+
+function scheduleCatalogSearch(query) {
+    clearTimeout(_catalogSearchTimer);
+    const token = ++catalogSearch.token;
+    catalogSearch.query = query.toLowerCase();
+    catalogSearch.status = 'loading';
+    catalogSearch.results = [];
+    // Debounced: handleSearch fires on every keystroke, and we don't want a
+    // network request per character.
+    _catalogSearchTimer = setTimeout(() => runCatalogSearch(query, token), 350);
+}
+
+async function runCatalogSearch(query, token) {
+    let results = [];
+    try {
+        results = await searchMusicCatalog(query, 25);
+    } catch (e) {
+        results = [];
+    }
+
+    // The user kept typing while this was in flight — drop the stale result.
+    if (token !== catalogSearch.token) return;
+
+    rememberCatalogSongs(results);
+    catalogSearch.results = results;
+    catalogSearch.status = results.length ? 'done' : 'empty';
+
+    if (currentView === 'search') renderView('search', currentViewData);
+}
+
 function renderSearch(el, songs, data) {
     const query = data?.query || '';
-    const q = query.toLowerCase();
+    const q = query.toLowerCase().trim();
     const results = q ? songs.filter(s =>
         s.title.toLowerCase().includes(q) ||
         s.artist.toLowerCase().includes(q) ||
@@ -138,22 +176,50 @@ function renderSearch(el, songs, data) {
         s.genre?.toLowerCase().includes(q)
     ) : [];
 
+    if (!q) {
+        catalogSearch.query = '';
+        catalogSearch.status = 'idle';
+        catalogSearch.results = [];
+    } else if (catalogSearch.query !== q) {
+        scheduleCatalogSearch(query);
+    }
+
+    // Don't show a catalog result we already have in the library above it.
+    const localKeys = new Set(results.map(songMatchKey));
+    const catalogResults = catalogSearch.query === q
+        ? catalogSearch.results.filter(s => !localKeys.has(songMatchKey(s)))
+        : [];
+    const isLoading = catalogSearch.query === q && catalogSearch.status === 'loading';
+
     el.innerHTML = `
         <div class="section-header">
             <h2 class="section-title">Search Results ${query ? 'for "' + escapeHtml(query) + '"' : ''}</h2>
-            <span style="color:var(--text-muted);font-size:13px;">${results.length} results</span>
+            <span style="color:var(--text-muted);font-size:13px;">${results.length + catalogResults.length} results</span>
         </div>
         ${results.length > 0 ? `
             <div class="cards-grid" style="margin-bottom:24px;">
                 ${buildCardGrid(results.slice(0, 8))}
             </div>
             ${songList(results)}
-        ` : `
+        ` : ''}
+        ${isLoading ? `
+            <div style="display:flex;align-items:center;gap:10px;color:var(--text-muted);font-size:13px;padding:20px;">
+                <i class="fas fa-spinner fa-spin"></i> Searching millions more songs...
+            </div>
+        ` : ''}
+        ${catalogResults.length > 0 ? `
+            <div class="section-header" style="margin-top:${results.length ? '32px' : '0'};">
+                <h2 class="section-title">More From Apple Music</h2>
+                <span style="color:var(--text-muted);font-size:13px;">${catalogResults.length} songs</span>
+            </div>
+            ${songList(catalogResults)}
+        ` : ''}
+        ${!results.length && !catalogResults.length && !isLoading ? `
             <div class="empty-state">
                 <i class="fas fa-search"></i>
                 <p>${q ? 'No results found. Try a different search.' : 'Type to search songs, artists, albums...'}</p>
             </div>
-        `}
+        ` : ''}
     `;
     updateAllPlayButtons();
 }
@@ -405,7 +471,9 @@ function renderQueue(el) {
 
 // ========== SEARCH HANDLER ==========
 function handleSearch(query) {
-    if (query.trim().length > 0) navigateTo('search', { query: query.trim() });
+    const trimmed = query.trim();
+    if (trimmed.length > 0) navigateTo('search', { query: trimmed });
+    else if (currentView === 'search') navigateTo('search', { query: '' });
 }
 
 // ==========================================================
@@ -486,7 +554,7 @@ function handleQueuePlay(songId, queueKey, index) {
         togglePlay();
     } else {
         const queue = getRegisteredQueue(queueKey);
-        const song = queue[index] || getAllSongs().find(s => s.id === songId);
+        const song = queue[index] || findSongById(songId);
         playSong(song, queue, index);
     }
     updateAllPlayButtons();
