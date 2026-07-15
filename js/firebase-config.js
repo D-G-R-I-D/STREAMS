@@ -9,7 +9,7 @@
   // For Firebase JS SDK v7.20.0 and later, measurementId is optional
   const firebaseConfig = {
     apiKey: "AIzaSyBkeva-FfZ_yBF-GB9E-8UuvhVJEvMNk4Y",
-    authDomain: "streams-dc14.firebaseapp.com",
+    authDomain: "streams-nine-lake.vercel.app",
     projectId: "streams-dc14",
     storageBucket: "streams-dc14.firebasestorage.app",
     messagingSenderId: "258675125700",
