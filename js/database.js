@@ -225,7 +225,16 @@ const DB = {
         catch { return null; }
     },
     set(key, val) {
-        localStorage.setItem('streams_' + key, JSON.stringify(val));
+        try {
+            localStorage.setItem('streams_' + key, JSON.stringify(val));
+            return true;
+        } catch (e) {
+            // Quota exceeded or storage blocked (e.g. iOS private mode). Swallow it so a
+            // storage hiccup can't throw out of background enrichment and wedge the whole
+            // pipeline — the in-memory data still drives the current render.
+            console.warn('DB.set failed for "' + key + '":', e && e.name);
+            return false;
+        }
     },
     remove(key) {
         localStorage.removeItem('streams_' + key);

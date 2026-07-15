@@ -351,37 +351,44 @@ async function enrichSongsWithRealData(options = {}) {
     isEnriching = true;
 
     const { limit = 80, force = false } = options;
-    let songs = DB.get('songs') || [];
+    let pendingSongs = [];
+    let batch = [];
 
-    const pendingSongs = songs.filter(song => shouldRefreshSong(song, force));
-    const batch = pendingSongs.slice(0, limit);
-    let updated = false;
+    // Wrapped so any unexpected error still resets isEnriching in the finally — otherwise a
+    // single throw would permanently stop all future enrichment (covers stuck on placeholders).
+    try {
+        let songs = DB.get('songs') || [];
 
-    // Enrich several songs concurrently rather than one every 350ms — this is what made
-    // real covers/audio take minutes to show up instead of seconds.
-    await runWithConcurrency(batch, async (song) => {
-        try {
-            const data = await fetchAppleMusicTrack(song.title, song.artist);
-            if (data) {
-                if (data.audioUrl) song.audioUrl = data.audioUrl;
-                if (data.cover) song.cover = data.cover;
-                if (data.album) song.album = data.album;
-                if (data.duration) song.duration = data.duration;
-                song.appleMusicVerified = true;
-                updated = true;
+        pendingSongs = songs.filter(song => shouldRefreshSong(song, force));
+        batch = pendingSongs.slice(0, limit);
+        let updated = false;
+
+        // Enrich several songs concurrently rather than one every 350ms — this is what made
+        // real covers/audio take minutes to show up instead of seconds.
+        await runWithConcurrency(batch, async (song) => {
+            try {
+                const data = await fetchAppleMusicTrack(song.title, song.artist);
+                if (data) {
+                    if (data.audioUrl) song.audioUrl = data.audioUrl;
+                    if (data.cover) song.cover = data.cover;
+                    if (data.album) song.album = data.album;
+                    if (data.duration) song.duration = data.duration;
+                    song.appleMusicVerified = true;
+                    updated = true;
+                }
+            } catch(e) {}
+        }, 5);
+
+        if (updated) {
+            DB.set('songs', songs);
+            preloadSongCovers(songs);
+            if (typeof renderView === 'function') {
+                renderView(currentView, typeof currentViewData !== 'undefined' ? currentViewData : null);
             }
-        } catch(e) {}
-    }, 5);
-
-    if (updated) {
-        DB.set('songs', songs);
-        preloadSongCovers(songs);
-        if (typeof renderView === 'function') {
-            renderView(currentView, typeof currentViewData !== 'undefined' ? currentViewData : null);
         }
+    } finally {
+        isEnriching = false;
     }
-
-    isEnriching = false;
 
     if (pendingSongs.length > batch.length) {
         setTimeout(() => enrichSongsWithRealData({ limit, force: false }), 300);

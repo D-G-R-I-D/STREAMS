@@ -6,7 +6,14 @@
 const ITUNES_CACHE = {};
 const DEEZER_CACHE = {};
 const NEGATIVE_CACHE = {}; // remembers lookups that found nothing, so we don't re-hit the network every retry
-const NEGATIVE_TTL_MS = 10 * 60 * 1000;
+// Kept short so a transient failure (common on mobile/cellular) self-heals on the next pass
+// instead of pinning a placeholder cover for minutes.
+const NEGATIVE_TTL_MS = 45 * 1000;
+// Network timeouts — generous enough for slow mobile connections. On fast links requests
+// resolve immediately regardless, so raising these never slows desktop; it only stops mobile
+// from abandoning requests that simply needed another second or two.
+const JSONP_TIMEOUT_MS = 8000;
+const PROXY_TIMEOUT_MS = 8000;
 const CATALOG_SEARCH_CACHE = {};
 const CATALOG_SEARCH_TTL_MS = 5 * 60 * 1000;
 let _jsonpId = 0;
@@ -78,7 +85,7 @@ function itunesJSONP(query, entity, limit) {
         const encoded = encodeURIComponent(query);
         script.src = `https://itunes.apple.com/search?term=${encoded}&media=music&entity=${entity}&limit=${limit}&country=US&lang=en_us&callback=${cbName}`;
 
-        const timeout = setTimeout(() => { cleanup(); resolve(null); }, 3500);
+        const timeout = setTimeout(() => { cleanup(); resolve(null); }, JSONP_TIMEOUT_MS);
 
         function cleanup() {
             clearTimeout(timeout);
@@ -107,7 +114,7 @@ async function itunesFetchViaProxy(query, entity, limit) {
     for (const candidate of candidates) {
         try {
             const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 4000);
+            const timer = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS);
             const response = await fetch(candidate, { headers: { Accept: 'application/json' }, signal: controller.signal });
             clearTimeout(timer);
             if (!response.ok) continue;

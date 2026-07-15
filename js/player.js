@@ -49,6 +49,37 @@ audioElement.addEventListener('loadedmetadata', () => {
     updateProgressUI();
 });
 
+// ========== MOBILE AUDIO UNLOCK ==========
+// iOS Safari / Android Chrome only allow HTMLMediaElement.play() if the FIRST play() for
+// the element happens synchronously inside a user gesture. Our real playback path awaits a
+// network fetch (to resolve the preview URL) before calling play() — by then the gesture is
+// gone, so mobile blocks it with NotAllowedError and nothing plays (desktop is lenient, so
+// it works there). Fix: on the very first user interaction anywhere, "bless" the shared
+// audio element with a silent play/pause inside that gesture. Once activated, all later
+// programmatic play() calls (including after an await) are permitted for the session.
+let _audioUnlocked = false;
+const _SILENT_WAV = 'data:audio/wav;base64,UklGRiwAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQgAAAAAAAAAAAAAAA==';
+const _UNLOCK_EVENTS = ['touchend', 'pointerdown', 'mousedown', 'keydown'];
+
+function unlockAudioPlayback() {
+    if (_audioUnlocked) return;
+    _audioUnlocked = true;
+    _UNLOCK_EVENTS.forEach(evt => document.removeEventListener(evt, unlockAudioPlayback, true));
+    try {
+        const hadRealSrc = !!audioElement.src && !audioElement.src.startsWith('data:audio/wav');
+        if (!hadRealSrc) audioElement.src = _SILENT_WAV;
+        const p = audioElement.play();
+        if (p && p.then) {
+            p.then(() => {
+                if (!hadRealSrc) { audioElement.pause(); audioElement.currentTime = 0; }
+            }).catch(() => {});
+        }
+    } catch (e) {}
+}
+
+// Capture phase so this runs before the tap reaches a play button and kicks off playback.
+_UNLOCK_EVENTS.forEach(evt => document.addEventListener(evt, unlockAudioPlayback, true));
+
 function updateProgressUI() {
     const pct = playerState.duration > 0 ? (playerState.currentTime / playerState.duration) * 100 : 0;
     const fill = document.getElementById('progressFill');
@@ -223,7 +254,7 @@ function togglePlay() {
     const btn = document.getElementById('mainPlayBtn');
     if (btn) btn.innerHTML = playerState.isPlaying ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
 
-    if (playerState.isPlaying) audioElement.play();
+    if (playerState.isPlaying) { const p = audioElement.play(); if (p && p.catch) p.catch(() => {}); }
     else audioElement.pause();
 
     updatePlayingHighlight();
